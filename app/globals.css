@@ -1,26 +1,45 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Paleta unica y clara. La app se usa de dia, sobre un mostrador, muchas
+ * veces desde el celular de un voluntario: sin modo oscuro a medias.
+ *
+ * El azul es el color de accion (botones, item activo, foco). El navy es
+ * solo del sidebar. El fondo de las pantallas es un gris levemente azulado
+ * para que las tarjetas blancas se despeguen.
+ */
+@theme {
+  --color-brand-50: #eef5ff;
+  --color-brand-100: #d8e8ff;
+  --color-brand-200: #b8d5ff;
+  --color-brand-500: #1668e0;
+  --color-brand-600: #1155bd;
+  --color-brand-700: #0d4394;
+
+  --color-navy-950: #08121f;
+  --color-navy-900: #0c1a2d;
+  --color-navy-800: #13253c;
+  --color-navy-700: #1c3552;
+  --color-navy-300: #93a7c0;
+
+  --color-canvas: #f5f7fb;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: #0f1b2d;
+}
+
+/* Panel del login: el mismo degrade que usa la marca. */
+.brand-gradient {
+  background: linear-gradient(150deg, #0d6ed6 0%, #1155bd 55%, #0a3a8f 100%);
 }
