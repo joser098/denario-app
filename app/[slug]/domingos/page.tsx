@@ -97,7 +97,7 @@ export default async function SundaysPage(props: PageProps<'/[slug]/domingos'>) 
 
                 <div className="flex items-center gap-4">
                   <span className="text-sm tabular-nums text-zinc-900">
-                    {isEmpty(totals.total) ? (
+                    {isEmpty(totals.moved) ? (
                       <span className="text-zinc-400">Sin movimientos</span>
                     ) : (
                       formatTotals(totals.total)

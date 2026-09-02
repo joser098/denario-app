@@ -216,13 +216,21 @@ export async function buildSundayActa(
   const { data: counts } = meetingIds.length
     ? await supabase
         .from('offering_counts')
-        .select('meeting_id, volunteer_name')
+        .select('meeting_id, volunteer_name, envelopes_count')
         .eq('status', 'finalized')
         .in('meeting_id', meetingIds)
-    : { data: [] as Array<{ meeting_id: string; volunteer_name: string | null }> };
+    : {
+        data: [] as Array<{
+          meeting_id: string;
+          volunteer_name: string | null;
+          envelopes_count: number;
+        }>,
+      };
 
   const totals = summarize(amounts);
   const countByMeeting = new Map((counts ?? []).map((c) => [c.meeting_id, c]));
+  // Solo actas finalizadas, igual que la ofrenda: la consulta ya filtra por eso.
+  const envelopes = (counts ?? []).reduce((sum, c) => sum + c.envelopes_count, 0);
 
   const sheet = await Sheet.create();
   await header(
@@ -284,13 +292,25 @@ export async function buildSundayActa(
   breakdownLine(sheet, totals.incomes);
   sheet.rule();
   sheet.row([
-    { text: 'Total del domingo', width: 280, bold: true },
+    { text: 'Total del domingo (sin ventas)', width: 280, bold: true },
     { text: formatTotals(totals.total), width: 203, align: 'right', bold: true },
+  ]);
+
+  // Los sobres van despues del total y con aire en medio: es un conteo, no
+  // plata, y pegado al total se leeria como parte de la suma.
+  sheet.gap(8);
+  sheet.row([
+    { text: 'Sobres recibidos', width: 280 },
+    { text: String(envelopes), width: 203, align: 'right' },
   ]);
 
   sheet.gap(8);
   sheet.text(
-    'La ofrenda y las ventas son plata distinta: lo cobrado por ventas no forma parte del acta de conteo, ni siquiera en efectivo.',
+    'La ofrenda y las ventas son plata distinta: lo cobrado por ventas no forma parte del acta de conteo, ni siquiera en efectivo, y no suma al total del domingo.',
+    { size: 9, muted: true },
+  );
+  sheet.text(
+    'Los sobres son un dato de control: la plata que tenían adentro ya está contada en la ofrenda.',
     { size: 9, muted: true },
   );
 

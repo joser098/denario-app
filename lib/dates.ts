@@ -115,6 +115,27 @@ export function formatShort(date: string): string {
   return SHORT.format(parseISODate(date));
 }
 
+const MONTH = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'UTC',
+  month: 'long',
+  year: 'numeric',
+});
+
+/** `"agosto de 2026"` */
+export function formatMonth(date: string): string {
+  return MONTH.format(parseISODate(date));
+}
+
+/** `true` si las dos fechas caen en el mismo mes calendario. */
+export function sameMonth(a: string, b: string): boolean {
+  return a.slice(0, 7) === b.slice(0, 7);
+}
+
+/** `"30 ago"`. Para ejes y etiquetas donde el año ya se sobreentiende. */
+export function formatDayMonth(date: string): string {
+  return DAY_MONTH.format(parseISODate(date));
+}
+
 /** `"12 ago — 18 ago"` */
 export function formatRange(range: DateRange): string {
   return `${DAY_MONTH.format(parseISODate(range.start))} — ${DAY_MONTH.format(parseISODate(range.end))}`;

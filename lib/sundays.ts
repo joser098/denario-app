@@ -17,13 +17,20 @@ export type AmountSummary = {
   /** Ingresos digitales cargados aparte. */
   incomes: Breakdown;
   /**
-   * Todo lo que entro: ofrenda + ventas + ingresos.
+   * Total del domingo: ofrenda + ingresos digitales.
    *
-   * La ofrenda y las ventas son plata distinta y se cuentan por separado.
-   * Lo cobrado por ventas en efectivo NO esta dentro del acta de conteo:
-   * el acta cuenta la ofrenda y nada mas.
+   * Las ventas quedan afuera a proposito. Es plata de otra naturaleza y la
+   * iglesia la lleva aparte: lo cobrado por ventas en efectivo tampoco esta
+   * dentro del acta de conteo, que cuenta la ofrenda y nada mas. Se siguen
+   * mostrando en su propia linea, con su desglose por medio de pago.
    */
   total: Totals;
+  /**
+   * Todo lo que se movio, ventas incluidas. No se muestra en ningun lado:
+   * sirve para saber si hubo actividad, porque un domingo de solo ventas
+   * tiene total 0 y no por eso esta vacio.
+   */
+  moved: Totals;
 };
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -52,21 +59,26 @@ export function summarize(rows: MeetingAmount[] | null | undefined): AmountSumma
     sales: { total: {}, byMethod: {} },
     incomes: { total: {}, byMethod: {} },
     total: {},
+    moved: {},
   };
 
   for (const row of rows ?? []) {
     const amount = Number(row.amount);
-    add(summary.total, row.currency_code, amount);
+    add(summary.moved, row.currency_code, amount);
 
+    // Que suma al total del domingo se decide aca, junto a cada tipo: la
+    // ofrenda y los ingresos digitales si, las ventas no.
     switch (row.kind) {
       case 'offering':
         add(summary.offering, row.currency_code, amount);
+        add(summary.total, row.currency_code, amount);
         break;
       case 'sale':
         addTo(summary.sales, row.method, row.currency_code, amount);
         break;
       case 'income':
         addTo(summary.incomes, row.method, row.currency_code, amount);
+        add(summary.total, row.currency_code, amount);
         break;
     }
   }

@@ -46,12 +46,17 @@ export default async function SundayPage(props: PageProps<'/[slug]/domingos/[sun
     supabase.from('meeting_amounts').select('*').eq('sunday_id', sundayId),
     supabase
       .from('offering_counts')
-      .select('id, meeting_id, status, sunday_meetings!inner(sunday_id)')
+      .select('id, meeting_id, status, envelopes_count, sunday_meetings!inner(sunday_id)')
       .neq('status', 'voided')
       .eq('sunday_meetings.sunday_id', sundayId),
   ]);
 
   const totals = summarize(amounts);
+  // Los sobres se cuentan con el mismo criterio que la ofrenda: solo las
+  // actas finalizadas, que son las unicas que aportan plata al total. Sumar
+  // los de un borrador mostraria sobres de plata que todavia no esta contada.
+  const finalized = (counts ?? []).filter((c) => c.status === 'finalized');
+  const envelopes = finalized.reduce((sum, c) => sum + c.envelopes_count, 0);
   const closed = sunday.status === 'closed';
   const campus = campuses.find((c) => c.id === sunday.campus_id);
   const countByMeeting = new Map((counts ?? []).map((c) => [c.meeting_id, c]));
@@ -73,8 +78,16 @@ export default async function SundayPage(props: PageProps<'/[slug]/domingos/[sun
         <Amount label="Ofrendas" totals={totals.offering} />
         <Amount label="Ventas" totals={totals.sales.total} breakdown={totals.sales} />
         <Amount label="Ingresos digitales" totals={totals.incomes.total} breakdown={totals.incomes} />
+        <div>
+          <p className="text-xs font-medium text-zinc-500">Sobres</p>
+          <p className="text-base tabular-nums text-zinc-900">
+            {finalized.length === 0 ? <span className="text-zinc-400">—</span> : envelopes}
+          </p>
+          <p className="text-xs text-zinc-500">dato de control</p>
+        </div>
         <div className="ml-auto text-right">
           <p className="text-xs font-medium text-zinc-500">Total del domingo</p>
+          <p className="text-[11px] text-zinc-400">sin contar ventas</p>
           <p className="text-xl font-semibold tabular-nums text-zinc-900">
             {formatTotals(totals.total)}
           </p>
@@ -128,7 +141,7 @@ export default async function SundayPage(props: PageProps<'/[slug]/domingos/[sun
                     <Badge tone="neutral">Sin acta</Badge>
                   )}
                 </div>
-                {isEmpty(meetingTotals.total) ? (
+                {isEmpty(meetingTotals.moved) ? (
                   <p className="text-base text-zinc-400">Sin movimientos</p>
                 ) : (
                   <div>
