@@ -119,9 +119,14 @@ export async function updateOrganizationLogo(
   // seguirian mostrando el logo viejo desde su cache.
   const path = `${ctx.organization.id}/logo-${Date.now()}.${extension}`;
 
+  // Sin upsert: el path lleva timestamp, asi que nunca hay colision. Pedirlo
+  // hacia que Storage resolviera el alta como "insert ... on conflict do
+  // update", y esa forma exige policy de select sobre storage.objects — que
+  // este bucket no tiene, porque se lee por URL publica. Resultado: RLS
+  // rechazaba cada subida.
   const { error } = await supabase.storage
     .from(LOGO_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: true });
+    .upload(path, file, { contentType: file.type });
 
   if (error) return { error: 'No pudimos subir el logo. Probá de nuevo.' };
 
