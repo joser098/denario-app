@@ -6,10 +6,11 @@ import {
   updateProduct,
 } from '@/lib/actions/settings';
 import { createClient } from '@/lib/supabase/server';
+import { listCurrencies } from '@/lib/currencies';
 import { ActionForm, SubmitButton } from '@/components/form';
 import { ModalButton } from '@/components/modal';
 import { MoveButtons } from '@/components/reorder';
-import { Badge, Card, EmptyState, Field, Input, Select } from '@/components/ui';
+import { Badge, Card, CurrencyOptions, EmptyState, Field, Input, Select } from '@/components/ui';
 
 export default async function ProductsSettingsPage(
   props: PageProps<'/[slug]/configuracion/productos'>,
@@ -18,6 +19,7 @@ export default async function ProductsSettingsPage(
   const { organization } = await requireOrg(slug);
 
   const supabase = await createClient();
+  const currencies = await listCurrencies(supabase);
   const { data: products } = await supabase
     .from('products')
     .select('*')
@@ -42,8 +44,7 @@ export default async function ProductsSettingsPage(
             </Field>
             <Field label="Moneda">
               <Select name="currency_code" defaultValue={organization.default_currency}>
-                <option value="ARS">Peso argentino (ARS)</option>
-                <option value="USD">Dólar estadounidense (USD)</option>
+                <CurrencyOptions currencies={currencies} long />
               </Select>
             </Field>
           </ActionForm>
@@ -82,8 +83,7 @@ export default async function ProductsSettingsPage(
                     defaultValue={product.currency_code}
                     className="w-28"
                   >
-                    <option value="ARS">ARS</option>
-                    <option value="USD">USD</option>
+                    <CurrencyOptions currencies={currencies} />
                   </Select>
                 </Field>
               </ActionForm>

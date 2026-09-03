@@ -2,9 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { canAdmin, canWrite, requireOrg, type OrgContext } from '@/lib/auth';
+import { canAdmin, canWrite, inCampus, requireOrg, type OrgContext } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { parseCountLines } from '@/lib/count-lines';
+import { campusCurrencies, listDenominations } from '@/lib/currencies';
 import { attachCountActa, attachSundayActa } from '@/lib/pdf/actas';
 import type { FormState } from '@/lib/forms';
 
@@ -23,6 +24,9 @@ async function writeContext(formData: FormData) {
 
 const DENIED: FormState = { error: 'No tenés permiso para cargar movimientos.' };
 
+/** Un domingo de otro campus no existe para quien esta acotado al suyo. */
+const NOT_MINE: FormState = { error: 'Ese domingo no existe.' };
+
 function fail(error: { message: string; code?: string }): FormState {
   if (error.code === '23505') return { error: 'Ya existe un registro para eso.' };
   return { error: error.message };
@@ -36,25 +40,62 @@ function meetingPath(ctx: OrgContext, sundayId: string, meetingId: string) {
   return `/${ctx.organization.slug}/domingos/${sundayId}/reuniones/${meetingId}`;
 }
 
-/** La reunion tiene que existir, ser de esta organizacion y estar abierta. */
+/**
+ * La reunion tiene que existir, ser de esta organizacion y de un campus que
+ * el miembro pueda tocar, y estar abierta.
+ */
 async function openMeeting(supabase: Supabase, ctx: OrgContext, meetingId: string) {
   const { data } = await supabase
     .from('sunday_meetings')
-    .select('id, sunday_id, status, sundays!inner(organization_id, status)')
+    .select(
+      'id, sunday_id, status, sundays!inner(organization_id, campus_id, status, campuses!inner(default_currency))',
+    )
     .eq('id', meetingId)
     .maybeSingle();
 
   if (!data) return { error: 'Esa reunión no existe.' } as const;
 
-  const sunday = data.sundays as unknown as { organization_id: string; status: string };
-  if (sunday.organization_id !== ctx.organization.id) {
+  const sunday = data.sundays as unknown as {
+    organization_id: string;
+    campus_id: string;
+    status: string;
+    campuses: { default_currency: string };
+  };
+  if (sunday.organization_id !== ctx.organization.id || !inCampus(ctx, sunday.campus_id)) {
     return { error: 'Esa reunión no existe.' } as const;
   }
   if (sunday.status === 'closed' || data.status === 'locked') {
     return { error: 'El domingo está cerrado. Reabrilo para poder cargar.' } as const;
   }
 
-  return { meeting: data } as const;
+  return { meeting: data, campusCurrency: sunday.campuses.default_currency } as const;
+}
+
+/** El domingo tiene que existir, ser de esta organizacion y del campus propio. */
+async function ownSunday(supabase: Supabase, ctx: OrgContext, sundayId: string) {
+  const { data } = await supabase
+    .from('sundays')
+    .select('id, status, campus_id')
+    .eq('id', sundayId)
+    .eq('organization_id', ctx.organization.id)
+    .maybeSingle();
+
+  if (!data || !inCampus(ctx, data.campus_id)) return null;
+  return data;
+}
+
+/** El acta tiene que colgar de un domingo de esta organizacion y del campus propio. */
+async function ownCount(supabase: Supabase, ctx: OrgContext, countId: string) {
+  const { data } = await supabase
+    .from('offering_counts')
+    .select('id, meeting_id, sunday_meetings!inner(sunday_id)')
+    .eq('id', countId)
+    .maybeSingle();
+
+  if (!data) return null;
+
+  const { sunday_id: sundayId } = data.sunday_meetings as unknown as { sunday_id: string };
+  return (await ownSunday(supabase, ctx, sundayId)) ? { ...data, sundayId } : null;
 }
 
 // ============================================================
@@ -68,6 +109,7 @@ export async function openSunday(_prev: FormState, formData: FormData): Promise<
   const campusId = String(formData.get('campus_id') ?? '');
   const date = String(formData.get('service_date') ?? '');
   if (!campusId) return { error: 'Elegí el campus.' };
+  if (!inCampus(ctx, campusId)) return { error: 'Ese campus no es el tuyo.' };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: 'Elegí la fecha del domingo.' };
 
   const supabase = await createClient();
@@ -95,14 +137,9 @@ export async function updateSundayNotes(
   const sundayId = String(formData.get('sunday_id'));
   const supabase = await createClient();
 
-  const { data: sunday } = await supabase
-    .from('sundays')
-    .select('status')
-    .eq('id', sundayId)
-    .eq('organization_id', ctx.organization.id)
-    .maybeSingle();
+  const sunday = await ownSunday(supabase, ctx, sundayId);
 
-  if (!sunday) return { error: 'Ese domingo no existe.' };
+  if (!sunday) return NOT_MINE;
   if (sunday.status === 'closed') {
     return { error: 'El domingo está cerrado. Reabrilo para poder editarlo.' };
   }
@@ -125,6 +162,7 @@ export async function closeSunday(_prev: FormState, formData: FormData): Promise
 
   const sundayId = String(formData.get('sunday_id'));
   const supabase = await createClient();
+  if (!(await ownSunday(supabase, ctx, sundayId))) return NOT_MINE;
 
   // Un domingo cerrado con actas a medio hacer no cierra nada: esas actas ya
   // no se van a poder tocar y el total del domingo queda mintiendo.
@@ -165,6 +203,8 @@ export async function reopenSunday(_prev: FormState, formData: FormData): Promis
 
   const sundayId = String(formData.get('sunday_id'));
   const supabase = await createClient();
+  if (!(await ownSunday(supabase, ctx, sundayId))) return NOT_MINE;
+
   const { error } = await supabase
     .from('sundays')
     .update({ status: 'draft', closed_at: null, closed_by: null })
@@ -214,13 +254,18 @@ export async function startCount(_prev: FormState, formData: FormData): Promise<
 }
 
 /** Cabecera + lineas del borrador. Devuelve el total contado por moneda. */
-async function persistDraft(supabase: Supabase, countId: string, formData: FormData) {
-  const { data: denominations } = await supabase
-    .from('currency_denominations')
-    .select('currency_code, value')
-    .eq('is_active', true);
+async function persistDraft(
+  supabase: Supabase,
+  countId: string,
+  campusCurrency: string,
+  formData: FormData,
+) {
+  // Acotado al campus, igual que la planilla: parseCountLines descarta lo que
+  // no este en esta lista, asi que es lo que impide guardar un billete de una
+  // moneda que ese campus no maneja.
+  const denominations = await listDenominations(supabase, campusCurrencies(campusCurrency));
 
-  const lines = parseCountLines(formData, denominations ?? []);
+  const lines = parseCountLines(formData, denominations);
 
   const { error: headerError } = await supabase
     .from('offering_counts')
@@ -268,7 +313,11 @@ async function loadDraft(supabase: Supabase, ctx: OrgContext, countId: string) {
   const check = await openMeeting(supabase, ctx, data.meeting_id);
   if ('error' in check) return { error: check.error } as const;
 
-  return { count: data, sundayId: check.meeting.sunday_id } as const;
+  return {
+    count: data,
+    sundayId: check.meeting.sunday_id,
+    campusCurrency: check.campusCurrency,
+  } as const;
 }
 
 export async function saveCount(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -280,7 +329,7 @@ export async function saveCount(_prev: FormState, formData: FormData): Promise<F
   const draft = await loadDraft(supabase, ctx, countId);
   if ('error' in draft) return { error: draft.error };
 
-  const result = await persistDraft(supabase, countId, formData);
+  const result = await persistDraft(supabase, countId, draft.campusCurrency, formData);
   if (result.error) return fail(result.error);
 
   revalidatePath(meetingPath(ctx, draft.sundayId, draft.count.meeting_id));
@@ -304,7 +353,7 @@ export async function finalizeCount(_prev: FormState, formData: FormData): Promi
     return { error: 'Poné al menos un testigo.' };
   }
 
-  const result = await persistDraft(supabase, countId, formData);
+  const result = await persistDraft(supabase, countId, draft.campusCurrency, formData);
   if (result.error) return fail(result.error);
 
   const { error } = await supabase
@@ -456,7 +505,7 @@ export async function addIncome(_prev: FormState, formData: FormData): Promise<F
   const { error } = await supabase.from('meeting_incomes').insert({
     meeting_id: meetingId,
     concept: 'mercadopago',
-    currency_code: String(formData.get('currency_code') || ctx.organization.default_currency),
+    currency_code: String(formData.get('currency_code') || check.campusCurrency),
     amount,
     reference: String(formData.get('reference') ?? '').trim() || null,
     created_by_name: String(formData.get('created_by_name') ?? '').trim() || null,
@@ -504,7 +553,10 @@ export async function generateCountActa(
   if (!ctx) return DENIED;
 
   const supabase = await createClient();
-  const ok = await attachCountActa(supabase, String(formData.get('count_id')));
+  const countId = String(formData.get('count_id'));
+  if (!(await ownCount(supabase, ctx, countId))) return { error: 'Ese acta no existe.' };
+
+  const ok = await attachCountActa(supabase, countId);
   if (!ok) return { error: 'No pudimos generar el PDF. Probá de nuevo en un rato.' };
 
   revalidatePath(
@@ -522,6 +574,8 @@ export async function generateSundayActa(
 
   const sundayId = String(formData.get('sunday_id'));
   const supabase = await createClient();
+  if (!(await ownSunday(supabase, ctx, sundayId))) return NOT_MINE;
+
   const ok = await attachSundayActa(supabase, sundayId, { closedBy: ctx.email });
   if (!ok) return { error: 'No pudimos generar el PDF. Probá de nuevo en un rato.' };
 

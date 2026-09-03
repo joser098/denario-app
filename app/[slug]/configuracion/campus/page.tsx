@@ -1,10 +1,11 @@
 import { requireOrg } from '@/lib/auth';
 import { createCampus, toggleCampus, updateCampus } from '@/lib/actions/settings';
 import { createClient } from '@/lib/supabase/server';
+import { listCurrencies } from '@/lib/currencies';
 import { TIMEZONES, timezoneLabel } from '@/lib/timezones';
 import { ActionForm, SubmitButton } from '@/components/form';
 import { ModalButton } from '@/components/modal';
-import { Badge, Card, Field, Input, Select } from '@/components/ui';
+import { Badge, Card, CurrencyOptions, Field, Input, Select } from '@/components/ui';
 
 export default async function CampusSettingsPage(
   props: PageProps<'/[slug]/configuracion/campus'>,
@@ -15,6 +16,7 @@ export default async function CampusSettingsPage(
   // Aca listamos tambien los inactivos: desactivar un campus es reversible y
   // el admin tiene que poder volver a prenderlo.
   const supabase = await createClient();
+  const currencies = await listCurrencies(supabase);
   const { data: campuses } = await supabase
     .from('campuses')
     .select('*')
@@ -32,8 +34,7 @@ export default async function CampusSettingsPage(
             </Field>
             <Field label="Moneda">
               <Select name="default_currency" defaultValue={organization.default_currency}>
-                <option value="ARS">Peso argentino (ARS)</option>
-                <option value="USD">Dólar estadounidense (USD)</option>
+                <CurrencyOptions currencies={currencies} long />
               </Select>
             </Field>
             <Field label="Zona horaria" hint="Dejala vacía para usar la de la organización.">
@@ -70,8 +71,7 @@ export default async function CampusSettingsPage(
                   defaultValue={campus.default_currency}
                   className="w-28"
                 >
-                  <option value="ARS">ARS</option>
-                  <option value="USD">USD</option>
+                  <CurrencyOptions currencies={currencies} />
                 </Select>
               </Field>
             </ActionForm>

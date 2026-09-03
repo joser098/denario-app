@@ -16,10 +16,17 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
   const writes = canWrite(role);
 
   const supabase = await createClient();
-  const { data: weeks } = await supabase
+  // Quien esta acotado a un campus ve solo las semanas de ese campus. RLS ya
+  // lo recorta; el filtro esta para que la consulta diga lo mismo que la
+  // pantalla.
+  const query = supabase
     .from('weeks')
     .select('id, start_date, end_date, status, campus_id')
-    .eq('organization_id', organization.id)
+    .eq('organization_id', organization.id);
+
+  if (campusId) query.eq('campus_id', campusId);
+
+  const { data: weeks } = await query
     .order('start_date', { ascending: false })
     .limit(30);
 
@@ -33,8 +40,7 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
     rowsByWeek.set(row.week_id, [...(rowsByWeek.get(row.week_id) ?? []), row]);
   }
 
-  const scopeName = (id: string | null) =>
-    id ? (campuses.find((c) => c.id === id)?.name ?? 'Campus') : 'Toda la organización';
+  const campusName = (id: string) => campuses.find((c) => c.id === id)?.name ?? 'Campus';
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,10 +67,13 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
                 required
               />
             </Field>
-            <Field label="Alcance">
-              <Select name="campus_id" defaultValue={campusId ?? ''} className="w-56">
-                {/* Un miembro atado a un campus no puede cargar a nivel organizacion. */}
-                {campusId ? null : <option value="">Toda la organización</option>}
+            <Field label="Campus">
+              <Select
+                name="campus_id"
+                defaultValue={campusId ?? campuses[0]?.id ?? ''}
+                className="w-56"
+                required
+              >
                 {campuses.map((campus) => (
                   <option key={campus.id} value={campus.id}>
                     {campus.name}
@@ -96,7 +105,7 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
                   <p className="text-sm font-medium text-zinc-900">
                     {formatRange({ start: week.start_date, end: week.end_date })}
                   </p>
-                  <p className="text-xs text-zinc-500">{scopeName(week.campus_id)}</p>
+                  <p className="text-xs text-zinc-500">{campusName(week.campus_id)}</p>
                 </div>
 
                 <div className="flex items-center gap-4">

@@ -85,6 +85,27 @@ export function Select({ className = '', ...props }: ComponentProps<'select'>) {
   return <select {...props} className={`${CONTROL} ${className}`} />;
 }
 
+/**
+ * Las opciones de un selector de moneda, a partir del catalogo.
+ *
+ * `long` para los formularios donde la moneda se elige una vez y conviene
+ * leerla entera ("Peso colombiano (COP)"); el codigo solo para los selectores
+ * angostos que van al lado de un monto.
+ */
+export function CurrencyOptions({
+  currencies,
+  long = false,
+}: {
+  currencies: Array<{ code: string; name: string }>;
+  long?: boolean;
+}) {
+  return currencies.map((currency) => (
+    <option key={currency.code} value={currency.code}>
+      {long ? `${currency.name} (${currency.code})` : currency.code}
+    </option>
+  ));
+}
+
 export function Textarea({ className = '', ...props }: ComponentProps<'textarea'>) {
   return (
     <textarea

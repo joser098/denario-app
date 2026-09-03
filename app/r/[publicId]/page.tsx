@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { submitPublicCount } from '@/lib/actions/public-count';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { campusCurrencies, listDenominations } from '@/lib/currencies';
+import { pdfName } from '@/lib/pdf/names';
 import { formatLong, formatTime } from '@/lib/dates';
 import { ActionForm } from '@/components/form';
 import { CountSheet } from '@/components/count-sheet';
@@ -19,7 +21,7 @@ export default async function PublicCountPage(props: PageProps<'/r/[publicId]'>)
   const { data: meeting } = await supabase
     .from('sunday_meetings')
     .select(
-      'id, label, start_time, status, sundays!inner(service_date, status, campuses!inner(name, organizations!inner(name)))',
+      'id, label, start_time, status, sundays!inner(service_date, status, campuses!inner(name, default_currency, organizations!inner(name)))',
     )
     .eq('public_id', publicId)
     .maybeSingle();
@@ -35,7 +37,7 @@ export default async function PublicCountPage(props: PageProps<'/r/[publicId]'>)
   const sunday = meeting.sundays as unknown as {
     service_date: string;
     status: string;
-    campuses: { name: string; organizations: { name: string } };
+    campuses: { name: string; default_currency: string; organizations: { name: string } };
   };
 
   const header = (
@@ -77,7 +79,14 @@ export default async function PublicCountPage(props: PageProps<'/r/[publicId]'>)
         ? (
             await supabase.storage
               .from('actas')
-              .createSignedUrl(existing.pdf_path, 300, { download: 'acta.pdf' })
+              .createSignedUrl(existing.pdf_path, 300, {
+                download: pdfName({
+                  kind: 'acta',
+                  campus: sunday.campuses.name,
+                  date: sunday.service_date,
+                  detail: meeting.label,
+                }),
+              })
           ).data?.signedUrl
         : null;
 
@@ -103,10 +112,10 @@ export default async function PublicCountPage(props: PageProps<'/r/[publicId]'>)
     );
   }
 
-  const { data: denominations } = await supabase
-    .from('currency_denominations')
-    .select('currency_code, value')
-    .eq('is_active', true);
+  // Solo la moneda del campus y el dolar: al voluntario no se le puede pedir
+  // que cuente reales en Buenos Aires.
+  const currencies = campusCurrencies(sunday.campuses.default_currency);
+  const denominations = await listDenominations(supabase, currencies);
 
   return (
     <Shell>
@@ -115,7 +124,7 @@ export default async function PublicCountPage(props: PageProps<'/r/[publicId]'>)
       <ActionForm action={submitPublicCount} submitLabel="Firmar y enviar" replaceOnSuccess>
         <input type="hidden" name="public_id" value={publicId} />
 
-        <CountSheet denominations={denominations ?? []} />
+        <CountSheet denominations={denominations} currencies={currencies} />
 
         <Field label="Tu nombre">
           <Input name="volunteer_name" required />

@@ -11,10 +11,17 @@ import { formatAmount, formatMoney } from '@/lib/money';
  */
 export function CountSheet({
   denominations,
+  currencies,
   initial = {},
   readOnly = false,
 }: {
   denominations: Denomination[];
+  /**
+   * En que orden van las secciones. La moneda del campus primero, el dolar
+   * despues: alfabetico pondria USD antes que UYU y en Uruguay la planilla
+   * arrancaria por los dolares.
+   */
+  currencies: string[];
   /** Cantidades ya guardadas, con clave `ARS:1000`. */
   initial?: Record<string, number>;
   readOnly?: boolean;
@@ -23,7 +30,9 @@ export function CountSheet({
     Object.fromEntries(Object.entries(initial).map(([key, value]) => [key, String(value)])),
   );
 
-  const currencies = [...new Set(denominations.map((d) => d.currency_code))].sort();
+  const shown = currencies.filter((currency) =>
+    denominations.some((d) => d.currency_code === currency),
+  );
 
   const subtotal = (currency: string, value: number) => {
     const quantity = Number(quantities[`${currency}:${value}`] ?? 0);
@@ -32,7 +41,7 @@ export function CountSheet({
 
   return (
     <div className="flex flex-col gap-6">
-      {currencies.map((currency) => {
+      {shown.map((currency) => {
         const rows = denominations
           .filter((d) => d.currency_code === currency)
           .sort((a, b) => Number(b.value) - Number(a.value));

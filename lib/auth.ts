@@ -8,7 +8,14 @@ export type OrgContext = {
   email: string;
   organization: Organization;
   role: MemberRole;
-  /** Campus asignado al miembro. null = ve todos (owner/admin). */
+  /**
+   * Campus al que esta acotado el miembro. null = ve toda la organizacion.
+   *
+   * Owner y admin siempre son null, aunque tengan un campus asignado: el
+   * campus acota a quien carga, no a quien administra. Espejo exacto de
+   * public.member_campus() en la base — si cambia uno tiene que cambiar el
+   * otro, porque la pantalla y RLS tienen que decir lo mismo.
+   */
   campusId: string | null;
   campuses: Campus[];
 };
@@ -73,8 +80,10 @@ export async function requireOrg(slug: string): Promise<OrgContext> {
     .eq('is_active', true)
     .order('name');
 
-  const visible = membership.campus_id
-    ? (campuses ?? []).filter((c) => c.id === membership.campus_id)
+  const campusId = canAdmin(membership.role) ? null : membership.campus_id;
+
+  const visible = campusId
+    ? (campuses ?? []).filter((c) => c.id === campusId)
     : (campuses ?? []);
 
   return {
@@ -82,9 +91,19 @@ export async function requireOrg(slug: string): Promise<OrgContext> {
     email: user.email ?? '',
     organization,
     role: membership.role,
-    campusId: membership.campus_id,
+    campusId,
     campuses: visible,
   };
+}
+
+/**
+ * Si el miembro puede tocar algo de ese campus. Un `null` es una fila que no
+ * es de ningun campus: la ve solo quien no esta acotado a uno.
+ *
+ * RLS ya rechaza lo demas; esto convierte el rechazo en un mensaje.
+ */
+export function inCampus(ctx: OrgContext, campusId: string | null) {
+  return ctx.campusId === null || ctx.campusId === campusId;
 }
 
 export function canWrite(role: MemberRole) {

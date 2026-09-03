@@ -1,42 +1,69 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { submitBudgetRequest, submitPurchaseRequest } from '@/lib/actions/public-requests';
+import {
+  submitBudget,
+  submitPaymentRequest,
+  submitPurchaseRequest,
+} from '@/lib/actions/public-requests';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { campusCurrencies, listCurrencies } from '@/lib/currencies';
 import { ActionForm } from '@/components/form';
 import { ItemRows } from '@/components/item-rows';
-import { Alert, Card, Field, Input, Select, Textarea } from '@/components/ui';
+import { Alert, Card, CurrencyOptions, Field, Input, Select, Textarea } from '@/components/ui';
 
 export const metadata = { title: 'Pedido a tesorería · Denario' };
 
+const KINDS = ['compra', 'presupuesto', 'pago'] as const;
+type Kind = (typeof KINDS)[number];
+
+function kindOf(value: unknown): Kind {
+  return KINDS.includes(value as Kind) ? (value as Kind) : 'compra';
+}
+
 /**
  * Formulario público de solicitudes. Lo usa el encargado de un ministerio,
- * sin cuenta: tener el link de la iglesia es la autorización.
+ * sin cuenta: tener el link es la autorización.
+ *
+ * El link es de un campus, no de la iglesia: el campus sale del token y no
+ * se pregunta, así que un pedido no puede caer en el campus equivocado.
  */
 export default async function PublicRequestPage(props: PageProps<'/p/[token]'>) {
   const { token } = await props.params;
   const { tipo } = await props.searchParams;
-  const budget = tipo === 'presupuesto';
+  const kind = kindOf(tipo);
 
   const supabase = createAdminClient();
-  const { data: organization } = await supabase
-    .from('organizations')
-    .select('id, name, default_currency')
+  const catalog = await listCurrencies(supabase);
+  const { data: campus } = await supabase
+    .from('campuses')
+    .select('id, name, organization_id, default_currency, organizations!inner(name, is_active)')
     .eq('public_request_token', token)
     .eq('is_active', true)
     .maybeSingle();
 
-  if (!organization) {
+  const organization = campus
+    ? (campus.organizations as unknown as { name: string; is_active: boolean })
+    : null;
+
+  if (!campus || !organization?.is_active) {
     return (
       <Shell>
-        <Alert tone="error">Este link no corresponde a ninguna iglesia.</Alert>
+        <Alert tone="error">Este link no corresponde a ningún campus.</Alert>
       </Shell>
     );
   }
 
+  // Solo lo que maneja este campus: pedir plata en una moneda que la
+  // tesoreria de ese campus no usa no le sirve a nadie.
+  const codes = campusCurrencies(campus.default_currency);
+  const currencies = codes
+    .map((code) => catalog.find((c) => c.code === code))
+    .filter((c) => c !== undefined);
+
   const { data: teams } = await supabase
     .from('teams')
     .select('id, name')
-    .eq('organization_id', organization.id)
+    .eq('organization_id', campus.organization_id)
     .eq('is_active', true)
     .order('sort_order');
 
@@ -58,10 +85,33 @@ export default async function PublicRequestPage(props: PageProps<'/p/[token]'>) 
 
   const currency = (
     <Field label="Moneda">
-      <Select name="estimated_currency" defaultValue={organization.default_currency}>
-        <option value="ARS">ARS</option>
-        <option value="USD">USD</option>
+      <Select name="estimated_currency" defaultValue={codes[0]}>
+        <CurrencyOptions currencies={currencies} />
       </Select>
+    </Field>
+  );
+
+  const optionalTeam = (
+    <Field label="Equipo" hint="Opcional.">
+      <Select name="team_id" defaultValue="">
+        <option value="">Sin equipo</option>
+        {(teams ?? []).map((team) => (
+          <option key={team.id} value={team.id}>
+            {team.name}
+          </option>
+        ))}
+      </Select>
+    </Field>
+  );
+
+  const quote = (label: string) => (
+    <Field label={label} hint="Opcional. PDF, PNG o JPG.">
+      <input
+        type="file"
+        name="file"
+        accept="application/pdf,image/png,image/jpeg"
+        className="w-full text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-600 hover:file:bg-brand-100"
+      />
     </Field>
   );
 
@@ -69,59 +119,69 @@ export default async function PublicRequestPage(props: PageProps<'/p/[token]'>) 
     <Shell>
       <header className="text-center">
         <p className="text-lg font-semibold tracking-tight text-navy-900">{organization.name}</p>
-        <p className="text-sm text-zinc-500">Pedido a tesorería</p>
+        <p className="text-sm text-zinc-500">{campus.name} · Pedido a tesorería</p>
       </header>
 
       <div className="flex gap-1 rounded-xl border border-zinc-200 bg-white p-1">
-        <Tab href={`/p/${token}`} active={!budget}>
+        <Tab href={`/p/${token}`} active={kind === 'compra'}>
           Compra
         </Tab>
-        <Tab href={`/p/${token}?tipo=presupuesto`} active={budget}>
+        <Tab href={`/p/${token}?tipo=presupuesto`} active={kind === 'presupuesto'}>
           Presupuesto
+        </Tab>
+        <Tab href={`/p/${token}?tipo=pago`} active={kind === 'pago'}>
+          Pago
         </Tab>
       </div>
 
-      {(teams ?? []).length === 0 && !budget ? (
+      {kind === 'compra' && (teams ?? []).length === 0 ? (
         <Alert tone="info">
           La iglesia todavía no cargó equipos. Avisale a la tesorería antes de pedir una compra.
         </Alert>
       ) : (
         <Card className="p-6">
-          {budget ? (
+          {kind === 'presupuesto' ? (
             <>
-              <h1 className="mb-1 text-base font-semibold text-navy-900">Pedir un presupuesto</h1>
+              <h1 className="mb-1 text-base font-semibold text-navy-900">Presentar un presupuesto</h1>
               <p className="mb-5 text-xs text-zinc-500">
-                Para un gasto puntual que no es una compra de rutina. Si tenés una cotización,
-                adjuntala.
+                Queda archivado en la tesorería como documentación. No es un pedido de plata: si
+                hay que pagarlo, la tesorería lo decide después.
               </p>
-              <ActionForm action={submitBudgetRequest} submitLabel="Enviar pedido">
-                <input type="hidden" name="org_token" value={token} />
+              <ActionForm action={submitBudget} submitLabel="Enviar presupuesto">
+                <input type="hidden" name="campus_token" value={token} />
                 {contact}
-                <Field label="Equipo" hint="Opcional.">
-                  <Select name="team_id" defaultValue="">
-                    <option value="">Sin equipo</option>
-                    {(teams ?? []).map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Para qué es">
+                {optionalTeam}
+                <Field label="De qué es">
                   <Textarea name="description" required placeholder="Arreglo del aire del salón." />
                 </Field>
-                <Field label="Monto estimado">
+                <Field label="Monto presupuestado">
                   <Input name="estimated_amount" inputMode="decimal" required />
                 </Field>
                 {currency}
-                <Field label="Cotización" hint="Opcional. PDF, PNG o JPG.">
-                  <input
-                    type="file"
-                    name="file"
-                    accept="application/pdf,image/png,image/jpeg"
-                    className="w-full text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-600 hover:file:bg-brand-100"
-                  />
+                {quote('Presupuesto')}
+              </ActionForm>
+            </>
+          ) : kind === 'pago' ? (
+            <>
+              <h1 className="mb-1 text-base font-semibold text-navy-900">
+                Pedir un pago o transferencia
+              </h1>
+              <p className="mb-5 text-xs text-zinc-500">
+                Para plata que hay que pagar o transferir. La tesorería lo aprueba y lo paga, o lo
+                rechaza.
+              </p>
+              <ActionForm action={submitPaymentRequest} submitLabel="Enviar pedido">
+                <input type="hidden" name="campus_token" value={token} />
+                {contact}
+                {optionalTeam}
+                <Field label="Para qué es">
+                  <Textarea name="description" required placeholder="Pago del service del aire." />
                 </Field>
+                <Field label="Monto a pagar">
+                  <Input name="estimated_amount" inputMode="decimal" required />
+                </Field>
+                {currency}
+                {quote('Comprobante o factura')}
               </ActionForm>
             </>
           ) : (
@@ -131,7 +191,7 @@ export default async function PublicRequestPage(props: PageProps<'/p/[token]'>) 
                 Lo que necesita tu equipo. La tesorería lo aprueba y después carga cuánto salió.
               </p>
               <ActionForm action={submitPurchaseRequest} submitLabel="Enviar pedido">
-                <input type="hidden" name="org_token" value={token} />
+                <input type="hidden" name="campus_token" value={token} />
                 {contact}
                 <Field label="Equipo">
                   <Select name="team_id" required>

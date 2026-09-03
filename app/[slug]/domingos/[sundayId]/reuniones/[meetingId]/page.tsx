@@ -11,6 +11,7 @@ import {
   voidCount,
 } from '@/lib/actions/sundays';
 import { createClient } from '@/lib/supabase/server';
+import { campusCurrencies, listCurrencies, listDenominations } from '@/lib/currencies';
 import { formatLong, formatTime } from '@/lib/dates';
 import { formatMoney, formatTotals, sumByCurrency } from '@/lib/money';
 import { siteOrigin } from '@/lib/site';
@@ -23,16 +24,7 @@ import {
 import { ActionForm, SubmitButton } from '@/components/form';
 import { CopyField } from '@/components/copy-field';
 import { CountForm } from '@/components/count-form';
-import {
-  Alert,
-  Badge,
-  Card,
-  EmptyState,
-  Field,
-  Input,
-  PageHeader,
-  Select,
-} from '@/components/ui';
+import { Alert, Badge, Card, CurrencyOptions, EmptyState, Field, Input, PageHeader, Select } from '@/components/ui';
 
 export default async function MeetingPage(
   props: PageProps<'/[slug]/domingos/[sundayId]/reuniones/[meetingId]'>,
@@ -41,6 +33,7 @@ export default async function MeetingPage(
   const { organization, campuses, role } = await requireOrg(slug);
 
   const supabase = await createClient();
+  const currencies = await listCurrencies(supabase);
   const { data: meeting } = await supabase
     .from('sunday_meetings')
     .select('*, sundays!inner(id, organization_id, campus_id, service_date, status)')
@@ -60,7 +53,6 @@ export default async function MeetingPage(
     { data: sales },
     { data: incomes },
     { data: products },
-    { data: denominations },
     { data: session },
   ] = await Promise.all([
     supabase
@@ -88,10 +80,6 @@ export default async function MeetingPage(
       .eq('is_active', true)
       .order('sort_order'),
     supabase
-      .from('currency_denominations')
-      .select('currency_code, value')
-      .eq('is_active', true),
-    supabase
       .from('meeting_sales_sessions')
       .select('*')
       .eq('meeting_id', meetingId)
@@ -116,6 +104,18 @@ export default async function MeetingPage(
   const writes = canWrite(role) && !locked;
   const origin = await siteOrigin();
   const campus = campuses.find((c) => c.id === sunday.campus_id);
+
+  // La moneda del campus, no la de la organizacion: en Quilmes se cuenta en
+  // pesos y en un campus de Bogota en pesos colombianos, sobre la misma app.
+  const countCurrencies = campusCurrencies(campus?.default_currency ?? organization.default_currency);
+  const denominations = await listDenominations(supabase, countCurrencies);
+
+  // El catalogo entero recortado a lo que se usa en este campus, en ese orden:
+  // un ingreso digital de esta reunion tampoco puede ser en una moneda que el
+  // campus no maneja.
+  const meetingCurrencies = countCurrencies
+    .map((code) => currencies.find((c) => c.code === code))
+    .filter((c) => c !== undefined);
 
   const countTotals = sumByCurrency(
     (lines ?? []).map((l) => ({ currency_code: l.currency_code, subtotal: Number(l.subtotal) })),
@@ -184,7 +184,8 @@ export default async function MeetingPage(
               action={submitCount}
               slug={slug}
               countId={count.id}
-              denominations={denominations ?? []}
+              denominations={denominations}
+              currencies={countCurrencies}
               quantities={Object.fromEntries(
                 (lines ?? []).map((l) => [
                   `${l.currency_code}:${Number(l.denomination_value)}`,
@@ -497,11 +498,10 @@ export default async function MeetingPage(
               <Field label="Moneda">
                 <Select
                   name="currency_code"
-                  defaultValue={organization.default_currency}
+                  defaultValue={countCurrencies[0]}
                   className="w-28"
                 >
-                  <option value="ARS">ARS</option>
-                  <option value="USD">USD</option>
+                  <CurrencyOptions currencies={meetingCurrencies} />
                 </Select>
               </Field>
               <Field label="Referencia">

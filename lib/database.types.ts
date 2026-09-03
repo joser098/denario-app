@@ -11,7 +11,7 @@ export type OfferingCountStatus = 'draft' | 'finalized' | 'voided';
 export type WeekStatus = 'open' | 'closed';
 export type WeekConceptKind = 'income' | 'expense';
 export type PurchaseStatus = 'pending' | 'approved' | 'rejected' | 'delivered';
-export type BudgetStatus = 'pending' | 'rejected' | 'paid';
+export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'paid';
 export type SalePaymentMethod = 'cash' | 'mercadopago';
 export type SalesSessionStatus = 'open' | 'closed';
 
@@ -42,8 +42,6 @@ export type Organization = {
   id: string;
   name: string;
   slug: string;
-  /** Link publico de solicitudes. Uno por organizacion, regenerable. */
-  public_request_token: string;
   timezone: string;
   default_currency: string;
   logo_path: string | null;
@@ -57,6 +55,8 @@ export type Campus = {
   organization_id: string;
   name: string;
   slug: string;
+  /** Link publico de solicitudes. Uno por campus, regenerable. */
+  public_request_token: string;
   default_currency: string;
   timezone: string | null;
   is_active: boolean;
@@ -250,6 +250,7 @@ export type PaymentMethod = {
 export type PurchaseRequest = {
   id: string;
   organization_id: string;
+  campus_id: string;
   team_id: string;
   requester_name: string;
   requester_email: string | null;
@@ -277,9 +278,15 @@ export type PurchaseRequestItem = {
   unit: string | null;
 };
 
-export type BudgetRequest = {
+/**
+ * Pagos y transferencias. Es la tabla que hasta la 20260903000002 se llamaba
+ * `budget_requests`: mismo flujo (pedir, aprobar-y-pagar o rechazar), nombre
+ * nuevo. "Presupuesto" ahora es otra cosa — ver `Budget`.
+ */
+export type PaymentRequest = {
   id: string;
   organization_id: string;
+  campus_id: string;
   team_id: string | null;
   requester_name: string;
   requester_email: string | null;
@@ -287,7 +294,7 @@ export type BudgetRequest = {
   description: string;
   estimated_amount: number;
   estimated_currency: string | null;
-  status: BudgetStatus;
+  status: PaymentStatus;
   rejection_reason: string | null;
   payment_method_id: string | null;
   actual_amount: number | null;
@@ -299,9 +306,55 @@ export type BudgetRequest = {
   updated_at: string;
 };
 
+/**
+ * Un presupuesto presentado. Documentacion y nada mas: no tiene estado
+ * porque no hay nada que decidir. Si hay que pagarlo, se genera desde aca
+ * una solicitud de pago y queda el vinculo en `payment_request_id`.
+ */
+export type Budget = {
+  id: string;
+  organization_id: string;
+  campus_id: string;
+  team_id: string | null;
+  requester_name: string;
+  requester_email: string | null;
+  requester_phone: string | null;
+  description: string;
+  estimated_amount: number;
+  estimated_currency: string | null;
+  payment_request_id: string | null;
+  public_token: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Pago en efectivo hecho desde la caja del campus. `receipt_number` lo pone
+ * un trigger, correlativo por campus: es el numero que va impreso en el
+ * recibo que firma el acreedor.
+ */
+export type CashPayment = {
+  id: string;
+  organization_id: string;
+  campus_id: string;
+  receipt_number: number;
+  payee_name: string;
+  payee_document: string | null;
+  concept: string;
+  team_id: string | null;
+  amount: number;
+  currency_code: string;
+  paid_on: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Attachment = {
   id: string;
   organization_id: string;
+  campus_id: string | null;
   attachable_type: string;
   attachable_id: string;
   kind: string;
@@ -339,7 +392,7 @@ export type WeekAmount = {
 export type Week = {
   id: string;
   organization_id: string;
-  campus_id: string | null;
+  campus_id: string;
   start_date: string;
   end_date: string;
   status: WeekStatus;
@@ -397,14 +450,41 @@ export type Database = {
       >;
       teams: Table<Team, 'organization_id' | 'name' | 'slug'>;
       payment_methods: Table<PaymentMethod, 'organization_id' | 'name'>;
-      purchase_requests: Table<PurchaseRequest, 'organization_id' | 'team_id' | 'requester_name'>;
+      purchase_requests: Table<
+        PurchaseRequest,
+        'organization_id' | 'campus_id' | 'team_id' | 'requester_name'
+      >;
       purchase_request_items: Table<
         PurchaseRequestItem,
         'purchase_request_id' | 'name' | 'quantity'
       >;
-      budget_requests: Table<
-        BudgetRequest,
-        'organization_id' | 'requester_name' | 'description' | 'estimated_amount'
+      payment_requests: Table<
+        PaymentRequest,
+        | 'organization_id'
+        | 'campus_id'
+        | 'requester_name'
+        | 'description'
+        | 'estimated_amount'
+      >;
+      budgets: Table<
+        Budget,
+        | 'organization_id'
+        | 'campus_id'
+        | 'requester_name'
+        | 'description'
+        | 'estimated_amount'
+      >;
+      // `receipt_number` no esta en la lista de obligatorias porque lo pone
+      // un trigger, correlativo por campus.
+      cash_payments: Table<
+        CashPayment,
+        | 'organization_id'
+        | 'campus_id'
+        | 'payee_name'
+        | 'concept'
+        | 'amount'
+        | 'currency_code'
+        | 'paid_on'
       >;
       attachments: Table<
         Attachment,
@@ -417,7 +497,7 @@ export type Database = {
         | 'content_type'
       >;
       week_concepts: Table<WeekConcept, 'code' | 'name'>;
-      weeks: Table<Week, 'organization_id' | 'start_date' | 'end_date'>;
+      weeks: Table<Week, 'organization_id' | 'campus_id' | 'start_date' | 'end_date'>;
       week_entries: Table<WeekEntry, 'week_id' | 'concept_id' | 'currency_code' | 'amount'>;
     };
     Views: {
@@ -435,6 +515,10 @@ export type Database = {
       };
       new_request_token: {
         Args: Record<never, never>;
+        Returns: string;
+      };
+      regenerate_campus_token: {
+        Args: { p_campus: string };
         Returns: string;
       };
       open_sunday: {
@@ -471,7 +555,7 @@ export type Database = {
       week_status: WeekStatus;
       week_concept_kind: WeekConceptKind;
       purchase_status: PurchaseStatus;
-      budget_status: BudgetStatus;
+      payment_status: PaymentStatus;
       sales_session_status: SalesSessionStatus;
     };
     CompositeTypes: Record<never, never>;

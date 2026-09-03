@@ -8,7 +8,8 @@ type Client = SupabaseClient<Database>;
 /** Códigos de los conceptos de egreso que crean los flujos de Gastos. */
 export const EXPENSE_CONCEPTS = {
   purchase: 'compras',
-  budget: 'presupuestos',
+  payment: 'pagos',
+  cash: 'pagos-efectivo',
 } as const;
 
 export const PURCHASE_STATUS_LABELS = {
@@ -18,8 +19,9 @@ export const PURCHASE_STATUS_LABELS = {
   delivered: 'Entregada',
 } as const;
 
-export const BUDGET_STATUS_LABELS = {
+export const PAYMENT_STATUS_LABELS = {
   pending: 'Pendiente',
+  approved: 'Aprobado',
   rejected: 'Rechazado',
   paid: 'Pagado',
 } as const;
@@ -39,6 +41,7 @@ export async function recordWeeklyExpense(
   supabase: Client,
   input: {
     organizationId: string;
+    campusId: string;
     conceptCode: string;
     amount: number;
     currency: string;
@@ -50,12 +53,13 @@ export async function recordWeeklyExpense(
 ): Promise<{ error?: string }> {
   const range = weekOf(input.date);
 
-  // El gasto es de la organización, no de un campus: va a la semana sin campus.
+  // El gasto es del campus que lo pidió, así que cae en la semana de ese
+  // campus — no en la de toda la organización.
   const { data: existing } = await supabase
     .from('weeks')
     .select('id, status')
     .eq('organization_id', input.organizationId)
-    .is('campus_id', null)
+    .eq('campus_id', input.campusId)
     .eq('start_date', range.start)
     .maybeSingle();
 
@@ -72,7 +76,7 @@ export async function recordWeeklyExpense(
       .from('weeks')
       .insert({
         organization_id: input.organizationId,
-        campus_id: null,
+        campus_id: input.campusId,
         start_date: range.start,
         end_date: range.end,
       })

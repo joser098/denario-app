@@ -6,20 +6,19 @@ import {
   updateWeekConcept,
 } from '@/lib/actions/settings';
 import { createClient } from '@/lib/supabase/server';
+import { listCurrencyCodes } from '@/lib/currencies';
 import { ActionForm, SubmitButton } from '@/components/form';
 import { ModalButton } from '@/components/modal';
 import { MoveButtons } from '@/components/reorder';
 import { Badge, Card, Field, Input, Select } from '@/components/ui';
 import { CONCEPT_KIND_LABELS } from '@/lib/weeks';
 
-const CURRENCIES = ['ARS', 'USD'];
-
-function CurrencyChecks({ selected }: { selected: string[] }) {
+function CurrencyChecks({ selected, codes }: { selected: string[]; codes: string[] }) {
   return (
     <fieldset className="flex flex-col gap-1.5 border-0 p-0">
       <legend className="text-sm font-medium text-zinc-700">Monedas</legend>
       <div className="flex h-10 items-center gap-4">
-        {CURRENCIES.map((code) => (
+        {codes.map((code) => (
           <label key={code} className="flex items-center gap-1.5 text-sm text-zinc-700">
             <input
               type="checkbox"
@@ -43,6 +42,7 @@ export default async function ConceptsSettingsPage(
   const { organization } = await requireOrg(slug);
 
   const supabase = await createClient();
+  const codes = await listCurrencyCodes(supabase);
   const { data: concepts } = await supabase
     .from('week_concepts')
     .select('*')
@@ -69,7 +69,7 @@ export default async function ConceptsSettingsPage(
                 <option value="expense">Egreso — resta del saldo</option>
               </Select>
             </Field>
-            <CurrencyChecks selected={['ARS']} />
+            <CurrencyChecks codes={codes} selected={['ARS']} />
             <label className="flex items-center gap-2 text-sm text-zinc-700">
               <input
                 type="checkbox"
@@ -96,7 +96,7 @@ export default async function ConceptsSettingsPage(
               <Field label="Concepto" hint={concept.code}>
                 <Input name="name" defaultValue={concept.name} className="w-52" required />
               </Field>
-              <CurrencyChecks selected={concept.allowed_currencies} />
+              <CurrencyChecks codes={codes} selected={concept.allowed_currencies} />
               <label className="flex h-10 items-center gap-2 text-sm text-zinc-700">
                 <input
                   type="checkbox"

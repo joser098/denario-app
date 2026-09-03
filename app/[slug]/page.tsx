@@ -35,11 +35,11 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
       .eq('organization_id', organization.id)
       .order('service_date', { ascending: false })
       .limit(60),
-    // Puede haber una semana por campus mas la de la organizacion. Si alguna
-    // sigue abierta, la semana todavia se esta cargando.
+    // Una semana por campus. Cual se muestra depende del campus elegido mas
+    // abajo, asi que se traen todas las de la fecha y se filtra despues.
     supabase
       .from('weeks')
-      .select('id, status')
+      .select('id, status, campus_id')
       .eq('organization_id', organization.id)
       .eq('start_date', week.start),
     supabase
@@ -48,8 +48,8 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
       .eq('organization_id', organization.id),
   ]);
 
-  // RLS deja leer los domingos de toda la organizacion; los campus visibles
-  // para este miembro los resuelve requireOrg, asi que el filtro va aca.
+  // RLS ya recorta por campus; el filtro queda porque `visible` tambien
+  // decide el campus por defecto y cual se puede elegir.
   const visible = new Set(campuses.map((c) => c.id));
   const sundays = (recentSundays ?? []).filter((s) => visible.has(s.campus_id));
 
@@ -77,7 +77,10 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
     .reverse();
 
   const sundayIds = charted.map((s) => s.id);
-  const weekIds = (currentWeeks ?? []).map((w) => w.id);
+  // El libro semanal es del campus: sumar los de todos los campus no da un
+  // numero que signifique nada, porque cada uno puede llevar otra moneda.
+  const campusWeeks = (currentWeeks ?? []).filter((w) => w.campus_id === selectedCampus);
+  const weekIds = campusWeeks.map((w) => w.id);
   const [{ data: sundayAmounts }, { data: weekRows }] = await Promise.all([
     sundayIds.length
       ? supabase.from('meeting_amounts').select('*').in('sunday_id', sundayIds)
@@ -100,11 +103,24 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
     return { date: s.service_date, totals: summary.total, loaded: !isEmpty(summary.moved) };
   });
   const weekBalance = weekTotals(weekRows);
-  const openWeek = (currentWeeks ?? []).some((w) => w.status === 'open');
+  const openWeek = campusWeeks.some((w) => w.status === 'open');
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Resumen" subtitle={formatLong(today)} />
+      {/* Un solo selector para toda la pantalla: Domingos, Semanal y el
+          grafico miran siempre el mismo campus. Tener uno por tarjeta seria
+          invitar a comparar numeros de campus distintos sin darse cuenta. */}
+      <PageHeader
+        title="Resumen"
+        subtitle={formatLong(today)}
+        actions={
+          canSwitchCampus ? (
+            <CampusPicker campuses={campuses} value={selectedCampus ?? ''} />
+          ) : (
+            <span className="self-center text-sm font-medium text-zinc-900">{campusName}</span>
+          )
+        }
+      />
 
       <div className="grid items-start gap-4 sm:grid-cols-2">
         <Card className="flex flex-col gap-3 p-5">
@@ -116,12 +132,6 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
               </Badge>
             ) : null}
           </div>
-
-          {canSwitchCampus ? (
-            <CampusPicker campuses={campuses} value={selectedCampus ?? ''} />
-          ) : (
-            <p className="text-sm text-zinc-900">{campusName}</p>
-          )}
 
           {lastSunday ? (
             <div>
@@ -155,10 +165,6 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
               <Badge tone={openWeek ? 'amber' : 'green'}>{openWeek ? 'Abierta' : 'Cerrada'}</Badge>
             )}
           </div>
-
-          {/* El libro semanal puede ser de un campus o de toda la organizacion,
-              asi que este total no se filtra por el campus de arriba. */}
-          <p className="text-sm text-zinc-900">Toda la organización</p>
 
           {hasMovements(weekBalance) ? (
             <div>

@@ -15,7 +15,10 @@ const schema = z.object({
     .max(40)
     .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Usá solo minúsculas, números y guiones.'),
   timezone: z.string().trim().min(1),
-  currency: z.enum(['ARS', 'USD']),
+  // El catalogo de monedas vive en la base y la FK a currencies(code) es
+  // la que rechaza una moneda que no existe: repetir la lista aca solo
+  // servia para bloquear las nuevas.
+  currency: z.string().trim().regex(/^[A-Z]{3}$/, 'Elegí una moneda.'),
 });
 
 export async function createOrganization(

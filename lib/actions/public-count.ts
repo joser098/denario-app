@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { campusCurrencies, listDenominations } from '@/lib/currencies';
 import { parseCountLines } from '@/lib/count-lines';
 import { attachCountActa } from '@/lib/pdf/actas';
 import type { FormState } from '@/lib/forms';
@@ -30,13 +31,16 @@ export async function submitPublicCount(
 
   const { data: meeting } = await supabase
     .from('sunday_meetings')
-    .select('id, status, sundays!inner(status)')
+    .select('id, status, sundays!inner(status, campuses!inner(default_currency))')
     .eq('public_id', publicId)
     .maybeSingle();
 
   if (!meeting) return { error: 'Este link no corresponde a ninguna reunión.' };
 
-  const sunday = meeting.sundays as unknown as { status: string };
+  const sunday = meeting.sundays as unknown as {
+    status: string;
+    campuses: { default_currency: string };
+  };
   if (meeting.status === 'locked' || sunday.status === 'closed') {
     return { error: 'Esta reunión ya está cerrada. Avisale a la tesorería.' };
   }
@@ -51,12 +55,15 @@ export async function submitPublicCount(
 
   if (existing) return { error: 'Esta reunión ya tiene un acta cargada.' };
 
-  const { data: denominations } = await supabase
-    .from('currency_denominations')
-    .select('currency_code, value')
-    .eq('is_active', true);
+  // Las denominaciones no son solo lo que se pinta: parseCountLines descarta
+  // toda linea que no este en esta lista, asi que acotarla al campus es lo
+  // que impide que alguien mande un billete de otra moneda por el link.
+  const denominations = await listDenominations(
+    supabase,
+    campusCurrencies(sunday.campuses.default_currency),
+  );
 
-  const lines = parseCountLines(formData, denominations ?? []);
+  const lines = parseCountLines(formData, denominations);
   if (lines.length === 0) return { error: 'Cargá al menos un billete.' };
 
   // Si esta reunion ya tuvo un acta anulada, la nueva queda encadenada a ella.

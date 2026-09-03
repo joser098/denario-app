@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { canAdmin, canWrite, requireOrg, type OrgContext } from '@/lib/auth';
+import { canAdmin, canWrite, inCampus, requireOrg, type OrgContext } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { weekOf } from '@/lib/dates';
 import type { FormState } from '@/lib/forms';
@@ -16,6 +16,9 @@ async function writeContext(formData: FormData) {
 }
 
 const DENIED: FormState = { error: 'No tenés permiso para cargar movimientos.' };
+
+/** Una semana de otro campus no existe para quien esta acotado al suyo. */
+const NOT_MINE: FormState = { error: 'Esa semana no existe.' };
 
 function fail(error: { message: string; code?: string }): FormState {
   if (error.code === '23505') return { error: 'Esa semana ya está abierta.' };
@@ -31,20 +34,30 @@ function weekPath(ctx: OrgContext, weekId: string) {
   return `/${ctx.organization.slug}/semanal/${weekId}`;
 }
 
-/** La semana tiene que existir, ser de esta organizacion y estar abierta. */
-async function openWeekRow(supabase: Supabase, ctx: OrgContext, weekId: string) {
+/**
+ * La semana tiene que existir, ser de esta organizacion y del campus del
+ * miembro, y estar abierta.
+ */
+async function ownWeek(supabase: Supabase, ctx: OrgContext, weekId: string) {
   const { data } = await supabase
     .from('weeks')
-    .select('id, status')
+    .select('id, status, campus_id')
     .eq('id', weekId)
     .eq('organization_id', ctx.organization.id)
     .maybeSingle();
 
-  if (!data) return { error: 'Esa semana no existe.' } as const;
-  if (data.status === 'closed') {
+  if (!data || !inCampus(ctx, data.campus_id)) return null;
+  return data;
+}
+
+async function openWeekRow(supabase: Supabase, ctx: OrgContext, weekId: string) {
+  const week = await ownWeek(supabase, ctx, weekId);
+
+  if (!week) return { error: NOT_MINE.error } as const;
+  if (week.status === 'closed') {
     return { error: 'La semana está cerrada. Reabrila para poder cargar.' } as const;
   }
-  return { week: data } as const;
+  return { week } as const;
 }
 
 // ============================================================
@@ -61,14 +74,18 @@ export async function openWeek(_prev: FormState, formData: FormData): Promise<Fo
   // La semana del reporte va de martes a lunes: la fecha elegida se corre al
   // martes de esa semana, sea cual sea el dia que hayan puesto.
   const range = weekOf(date);
+  // Toda semana es de un campus: no existe mas el libro de toda la
+  // organizacion, porque cada campus puede llevar su propia moneda.
   const campusId = String(formData.get('campus_id') ?? '');
+  if (!campusId) return { error: 'Elegí el campus.' };
+  if (!inCampus(ctx, campusId)) return { error: 'Ese campus no es el tuyo.' };
 
   const supabase = await createClient();
   const { data: week, error } = await supabase
     .from('weeks')
     .insert({
       organization_id: ctx.organization.id,
-      campus_id: campusId || null,
+      campus_id: campusId,
       start_date: range.start,
       end_date: range.end,
     })
@@ -112,6 +129,8 @@ export async function closeWeek(_prev: FormState, formData: FormData): Promise<F
 
   const weekId = String(formData.get('week_id'));
   const supabase = await createClient();
+  if (!(await ownWeek(supabase, ctx, weekId))) return NOT_MINE;
+
   const { error } = await supabase
     .from('weeks')
     .update({ status: 'closed', closed_at: new Date().toISOString(), closed_by: ctx.userId })
@@ -134,6 +153,8 @@ export async function reopenWeek(_prev: FormState, formData: FormData): Promise<
 
   const weekId = String(formData.get('week_id'));
   const supabase = await createClient();
+  if (!(await ownWeek(supabase, ctx, weekId))) return NOT_MINE;
+
   const { error } = await supabase
     .from('weeks')
     .update({ status: 'open', closed_at: null, closed_by: null })

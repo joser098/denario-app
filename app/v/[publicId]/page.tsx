@@ -9,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { formatLong, formatTime } from '@/lib/dates';
 import { formatMoney, formatTotals } from '@/lib/money';
 import { methodLabel, methodsOf, type Breakdown } from '@/lib/sundays';
+import { pdfName } from '@/lib/pdf/names';
 import { ActionForm, SubmitButton } from '@/components/form';
 import { Alert, Card, Field, Input, Select, Textarea } from '@/components/ui';
 
@@ -142,7 +143,14 @@ export default async function PublicSalesPage(props: PageProps<'/v/[publicId]'>)
       ? (
           await supabase.storage
             .from('actas')
-            .createSignedUrl(session.pdf_path, 300, { download: 'cierre-de-caja.pdf' })
+            .createSignedUrl(session.pdf_path, 300, {
+              download: pdfName({
+                kind: 'caja',
+                campus: sunday.campuses.name,
+                date: sunday.service_date,
+                detail: meeting.label,
+              }),
+            })
         ).data?.signedUrl
       : null;
 

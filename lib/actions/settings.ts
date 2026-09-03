@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { canAdmin, requireOrg } from '@/lib/auth';
+import { canAdmin, canWrite, requireOrg } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import type { FormState } from '@/lib/forms';
 import { LOGO_BUCKET } from '@/lib/logo';
@@ -49,7 +49,7 @@ const orgSchema = z.object({
     .min(3, 'El identificador necesita al menos 3 caracteres.')
     .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Usá solo minúsculas, números y guiones.'),
   timezone: z.string().trim().min(1),
-  default_currency: z.enum(['ARS', 'USD']),
+  default_currency: z.string().trim().regex(/^[A-Z]{3}$/, 'Elegí una moneda.'),
 });
 
 export async function updateOrganization(
@@ -788,17 +788,21 @@ export async function movePaymentMethod(formData: FormData) {
 }
 
 /** Si el link se filtró, se corta y se reparte uno nuevo. */
+/**
+ * El link de pedidos es de un campus, asi que se regenera de a uno — y lo
+ * puede cortar el tesorero de ese campus, no solo un administrador: si se
+ * filtro, el que se entera primero es el que atiende los pedidos.
+ *
+ * Va por RPC y no por un update directo porque `campuses_write` sigue siendo
+ * de administradores: lo unico que se abre es el token.
+ */
 export async function regenerateRequestToken(formData: FormData) {
-  const ctx = await adminContext(formData);
-  if (!ctx) return;
+  const ctx = await requireOrg(String(formData.get('slug') ?? ''));
+  if (!canWrite(ctx.role)) return;
 
   const supabase = await createClient();
-  await supabase.rpc('new_request_token').then(async ({ data }) => {
-    if (!data) return;
-    await supabase
-      .from('organizations')
-      .update({ public_request_token: data })
-      .eq('id', ctx.organization.id);
+  await supabase.rpc('regenerate_campus_token', {
+    p_campus: String(formData.get('campus_id')),
   });
 
   revalidatePath(`/${ctx.organization.slug}/gastos`, 'layout');

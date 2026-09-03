@@ -1,6 +1,13 @@
+// Espejo de currencies.symbol. Vive aca porque formatMoney es sincrona y se
+// usa tambien del lado del cliente; al agregar una moneda, agregar el simbolo.
+// Varios pesos comparten "$" a proposito: el codigo va siempre al lado.
 const SYMBOLS: Record<string, string> = {
   ARS: '$',
   USD: 'US$',
+  COP: '$',
+  BRL: 'R$',
+  UYU: '$U',
+  MXN: '$',
 };
 
 const NUMBER = new Intl.NumberFormat('es-AR', {
@@ -51,4 +58,19 @@ export function formatTotals(totals: Record<string, number>, separator = ' · ')
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([currency, amount]) => formatMoney(amount, currency));
   return parts.length ? parts.join(separator) : formatMoney(0, 'ARS');
+}
+
+/**
+ * Las monedas que se manejan en un campus: la suya y el dolar.
+ *
+ * El dolar va siempre porque la ofrenda en dolares aparece en cualquier lado
+ * y no depende del pais. La local va primero: es la que se cuenta de verdad,
+ * y el orden de la planilla del acta sale de aca — alfabetico pondria USD
+ * antes que UYU y en Uruguay el acta arrancaria por los dolares.
+ *
+ * Vive aca y no en lib/currencies.ts porque es pura: no consulta nada, y asi
+ * tambien la puede usar un componente cliente.
+ */
+export function campusCurrencies(defaultCurrency: string): string[] {
+  return defaultCurrency === 'USD' ? ['USD'] : [defaultCurrency, 'USD'];
 }

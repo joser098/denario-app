@@ -16,6 +16,7 @@ export function CountForm({
   slug,
   countId,
   denominations,
+  currencies,
   quantities,
   defaults,
 }: {
@@ -23,6 +24,7 @@ export function CountForm({
   slug: string;
   countId: string;
   denominations: Denomination[];
+  currencies: string[];
   quantities: Record<string, number>;
   defaults: {
     volunteer_name: string;
@@ -43,7 +45,7 @@ export function CountForm({
       {state.message ? <Alert tone="success">{state.message}</Alert> : null}
 
       <fieldset disabled={pending} className="flex flex-col gap-6 border-0 p-0">
-        <CountSheet denominations={denominations} initial={quantities} />
+        <CountSheet denominations={denominations} currencies={currencies} initial={quantities} />
 
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Contó">

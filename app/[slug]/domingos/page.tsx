@@ -11,14 +11,20 @@ import { Badge, Card, EmptyState, Field, Input, PageHeader, Select } from '@/com
 
 export default async function SundaysPage(props: PageProps<'/[slug]/domingos'>) {
   const { slug } = await props.params;
-  const { organization, campuses, role } = await requireOrg(slug);
+  const { organization, campuses, campusId, role } = await requireOrg(slug);
   const writes = canWrite(role);
 
   const supabase = await createClient();
-  const { data: sundays } = await supabase
+  // RLS ya recorta por campus; el filtro esta igual para que la consulta diga
+  // lo mismo que la pantalla.
+  const query = supabase
     .from('sundays')
     .select('id, service_date, status, campus_id')
-    .eq('organization_id', organization.id)
+    .eq('organization_id', organization.id);
+
+  if (campusId) query.eq('campus_id', campusId);
+
+  const { data: sundays } = await query
     .order('service_date', { ascending: false })
     .limit(30);
 

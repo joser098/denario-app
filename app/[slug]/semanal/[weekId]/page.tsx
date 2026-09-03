@@ -42,9 +42,7 @@ export default async function WeekPage(props: PageProps<'/[slug]/semanal/[weekId
   const closed = week.status === 'closed';
   const writes = canWrite(role) && !closed;
   const range = { start: week.start_date, end: week.end_date };
-  const scope = week.campus_id
-    ? (campuses.find((c) => c.id === week.campus_id)?.name ?? 'Campus')
-    : 'Toda la organización';
+  const scope = campuses.find((c) => c.id === week.campus_id)?.name ?? 'Campus';
 
   const conceptById = new Map((concepts ?? []).map((c) => [c.id, c]));
   const rows = entries ?? [];

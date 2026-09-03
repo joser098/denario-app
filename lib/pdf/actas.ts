@@ -43,7 +43,7 @@ export type Logo = { bytes: Uint8Array; kind: 'png' | 'jpg' };
  * Baja el logo de la organizacion para estamparlo en el PDF. Si falla, el
  * documento sale igual: el logo es decoracion, no contenido.
  */
-async function loadLogo(supabase: Client, logoPath: string | null): Promise<Logo | null> {
+export async function loadLogo(supabase: Client, logoPath: string | null): Promise<Logo | null> {
   if (!logoPath) return null;
 
   const { data } = await supabase.storage.from('logos').download(logoPath);
@@ -160,7 +160,7 @@ export async function buildCountActa(supabase: Client, countId: string): Promise
 
   sheet.gap(10);
   sheet.text(
-    `Sobres recibidos: ${count.envelopes_count}. Es un dato de control: la plata que tenían adentro ya está contada en el detalle de arriba.`,
+    `Sobres recibidos: ${count.envelopes_count}.`,
     { size: 9, muted: true },
   );
 
@@ -325,7 +325,7 @@ export async function buildSundayActa(
   sheet.footer([`Cerrado el ${stamp(sunday.closed_at)}`, GENERATED_BY]);
 
   return {
-    path: `${sunday.organization_id}/${sunday.id}/cierre.pdf`,
+    path: `${sunday.organization_id}/${sunday.id}/cierre-${sunday.closed_at}.pdf`,
     bytes: await sheet.save(),
   };
 }

@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { createOrganization } from '@/lib/actions/organizations';
 import { listOrganizations, requireUser } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
+import { listCurrencies } from '@/lib/currencies';
 import { ActionForm } from '@/components/form';
-import { Field, Input, Select } from '@/components/ui';
+import { CurrencyOptions, Field, Input, Select } from '@/components/ui';
 import { TIMEZONES, timezoneLabel } from '@/lib/timezones';
 
 export const metadata = { title: 'Nueva organización · Denario' };
@@ -10,6 +12,7 @@ export const metadata = { title: 'Nueva organización · Denario' };
 export default async function NewOrganizationPage() {
   await requireUser();
   const existing = await listOrganizations();
+  const currencies = await listCurrencies(await createClient());
 
   return (
     <div className="flex flex-1 items-center justify-center px-4 py-12">
@@ -45,8 +48,7 @@ export default async function NewOrganizationPage() {
             </Field>
             <Field label="Moneda principal">
               <Select name="currency" defaultValue="ARS">
-                <option value="ARS">Peso argentino (ARS)</option>
-                <option value="USD">Dólar estadounidense (USD)</option>
+                <CurrencyOptions currencies={currencies} long />
               </Select>
             </Field>
           </ActionForm>

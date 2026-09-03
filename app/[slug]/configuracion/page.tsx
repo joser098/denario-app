@@ -5,16 +5,19 @@ import {
   updateOrganization,
   updateOrganizationLogo,
 } from '@/lib/actions/settings';
+import { createClient } from '@/lib/supabase/server';
+import { listCurrencies } from '@/lib/currencies';
 import { logoUrl } from '@/lib/logo';
 import { TIMEZONES, timezoneLabel } from '@/lib/timezones';
 import { ActionForm, SubmitButton } from '@/components/form';
-import { Card, Field, Input, Select } from '@/components/ui';
+import { Card, CurrencyOptions, Field, Input, Select } from '@/components/ui';
 
 export default async function OrganizationSettingsPage(
   props: PageProps<'/[slug]/configuracion'>,
 ) {
   const { slug } = await props.params;
   const { organization } = await requireOrg(slug);
+  const currencies = await listCurrencies(await createClient());
   const logo = logoUrl(organization.logo_path);
 
   return (
@@ -50,8 +53,7 @@ export default async function OrganizationSettingsPage(
 
           <Field label="Moneda principal">
             <Select name="default_currency" defaultValue={organization.default_currency}>
-              <option value="ARS">Peso argentino (ARS)</option>
-              <option value="USD">Dólar estadounidense (USD)</option>
+              <CurrencyOptions currencies={currencies} long />
             </Select>
           </Field>
         </ActionForm>
