@@ -72,13 +72,25 @@ export function Field({
 
 const CONTROL = [
   'h-10 w-full rounded-lg border border-zinc-300 bg-white px-3',
-  'text-sm text-zinc-900 placeholder:text-zinc-400',
+  'text-sm text-zinc-900 placeholder:text-zinc-500',
   'focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none',
   'disabled:bg-zinc-100 disabled:text-zinc-500',
 ].join(' ');
 
-export function Input({ className = '', ...props }: ComponentProps<'input'>) {
-  return <input {...props} className={`${CONTROL} ${className}`} />;
+/**
+ * `compact` baja el alto de 40 a 36 y achica el padding. Es para las grillas
+ * de carga —el Profit & Loss son diecisiete campos— donde cuatro pixeles por
+ * fila son la diferencia entre entrar en pantalla y no entrar. No se puede
+ * pisar con className: dos clases de alto compiten sin ganador previsible.
+ */
+const CONTROL_COMPACT = CONTROL.replace('h-10', 'h-8').replace('px-3', 'px-2.5');
+
+export function Input({
+  className = '',
+  compact = false,
+  ...props
+}: ComponentProps<'input'> & { compact?: boolean }) {
+  return <input {...props} className={`${compact ? CONTROL_COMPACT : CONTROL} ${className}`} />;
 }
 
 export function Select({ className = '', ...props }: ComponentProps<'select'>) {
@@ -129,8 +141,13 @@ export function Alert({
   children: ReactNode;
 }) {
   if (!children) return null;
+  // Un error interrumpe (`alert`); un exito o un aviso esperan a que el lector
+  // termine lo que estaba diciendo (`status`).
   return (
-    <p className={`rounded-lg border px-3 py-2 text-sm ${TONES[tone]}`} role="status">
+    <p
+      className={`rounded-lg border px-3 py-2 text-sm ${TONES[tone]}`}
+      role={tone === 'error' ? 'alert' : 'status'}
+    >
       {children}
     </p>
   );

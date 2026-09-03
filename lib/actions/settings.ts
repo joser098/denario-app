@@ -8,6 +8,7 @@ import { canAdmin, canWrite, requireOrg } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import type { FormState } from '@/lib/forms';
 import { LOGO_BUCKET } from '@/lib/logo';
+import { parseAmount } from '@/lib/money';
 import { nextOrder, reorder } from '@/lib/order';
 import { RESERVED_SLUGS, slugify } from '@/lib/slug';
 
@@ -29,8 +30,10 @@ function fail(error: { message: string; code?: string }): FormState {
   return { error: error.message };
 }
 
+// parseAmount y no un replace a mano: el precio llega con separadores de
+// miles, y sacar solo la coma leia "1.000" como 1.
 function amount(value: FormDataEntryValue | null): number {
-  return Number(String(value ?? '').replace(',', '.'));
+  return parseAmount(value);
 }
 
 function direction(formData: FormData): -1 | 1 {

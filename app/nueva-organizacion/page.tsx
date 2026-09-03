@@ -11,8 +11,11 @@ export const metadata = { title: 'Nueva organización · Denario' };
 
 export default async function NewOrganizationPage() {
   await requireUser();
-  const existing = await listOrganizations();
-  const currencies = await listCurrencies(await createClient());
+  const supabase = await createClient();
+  const [existing, currencies] = await Promise.all([
+    listOrganizations(),
+    listCurrencies(supabase),
+  ]);
 
   return (
     <div className="flex flex-1 items-center justify-center px-4 py-12">

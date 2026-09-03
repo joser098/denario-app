@@ -49,7 +49,12 @@ export function CountSheet({
         const total = rows.reduce((sum, row) => sum + subtotal(currency, Number(row.value)), 0);
 
         return (
-          <div key={currency} className="flex flex-col gap-2">
+          <div
+            key={currency}
+            role="group"
+            aria-label={`Billetes en ${currency}`}
+            className="flex flex-col gap-2"
+          >
             <div className="grid grid-cols-[1fr_5.5rem_8rem] items-center gap-2 px-1 text-xs font-medium text-zinc-500">
               <span>Billete {currency}</span>
               <span className="text-center">Cantidad</span>
@@ -59,6 +64,9 @@ export function CountSheet({
             {rows.map((row) => {
               const value = Number(row.value);
               const key = `${currency}:${value}`;
+              // El id no puede llevar los dos puntos de la clave: valen en
+              // HTML5 pero rompen querySelector y los selectores CSS.
+              const inputId = `billete-${currency}-${value}`;
               const line = subtotal(currency, value);
 
               return (
@@ -66,10 +74,14 @@ export function CountSheet({
                   key={key}
                   className="grid grid-cols-[1fr_5.5rem_8rem] items-center gap-2 rounded-lg px-1 py-0.5 odd:bg-zinc-50"
                 >
-                  <span className="text-sm font-medium text-zinc-900">
+                  {/* El monto es el nombre del campo, no un adorno al lado:
+                      sin esto un lector de pantalla dice "campo de edicion"
+                      una vez por billete y no se sabe cual es cual. */}
+                  <label htmlFor={inputId} className="text-sm font-medium text-zinc-900">
                     {formatMoney(value, currency)}
-                  </span>
+                  </label>
                   <input
+                    id={inputId}
                     type="number"
                     inputMode="numeric"
                     min={0}

@@ -16,7 +16,7 @@ export default async function HomePage() {
   if (organizations.length === 1) redirect(`/${organizations[0].slug}`);
 
   return (
-    <div className="flex flex-1 items-center justify-center px-4 py-12">
+    <main className="flex flex-1 items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <h1 className="mb-1 text-center text-2xl font-semibold tracking-tight text-zinc-900">
           Denario
@@ -31,7 +31,9 @@ export default async function HomePage() {
               className="flex items-center justify-between px-4 py-3 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
             >
               {org.name}
-              <span className="text-zinc-400">→</span>
+              <span aria-hidden="true" className="text-zinc-500">
+                →
+              </span>
             </Link>
           ))}
         </Card>
@@ -42,6 +44,6 @@ export default async function HomePage() {
           </Button>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

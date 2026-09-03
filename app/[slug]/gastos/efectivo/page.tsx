@@ -5,7 +5,10 @@ import { campusCurrencies, listCurrencies } from '@/lib/currencies';
 import { formatShort, todayIn } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { ActionForm } from '@/components/form';
+import { MoneyInput } from '@/components/money-input';
 import { Card, CurrencyOptions, EmptyState, Field, Input, PageHeader, Select, Textarea } from '@/components/ui';
+
+export const metadata = { title: 'Pagos en efectivo' };
 
 /**
  * Pagos en efectivo de la caja del campus.
@@ -20,8 +23,8 @@ export default async function CashPaymentsPage(props: PageProps<'/[slug]/gastos/
   const writes = canWrite(role);
 
   const supabase = await createClient();
-  const currencies = await listCurrencies(supabase);
-  const [{ data: payments }, { data: teams }] = await Promise.all([
+  const [currencies, { data: payments }, { data: teams }] = await Promise.all([
+    listCurrencies(supabase),
     supabase
       .from('cash_payments')
       .select('*')
@@ -92,7 +95,7 @@ export default async function CashPaymentsPage(props: PageProps<'/[slug]/gastos/
 
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Monto">
-                <Input name="amount" inputMode="decimal" required />
+                <MoneyInput name="amount" required />
               </Field>
               <Field label="Moneda">
                 <Select

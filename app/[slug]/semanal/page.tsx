@@ -10,6 +10,8 @@ import { hasMovements, weekTotals } from '@/lib/weeks';
 import { ActionForm } from '@/components/form';
 import { Badge, Card, EmptyState, Field, Input, PageHeader, Select } from '@/components/ui';
 
+export const metadata = { title: 'Semanal' };
+
 export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
   const { slug } = await props.params;
   const { organization, campuses, campusId, role } = await requireOrg(slug);
@@ -122,7 +124,7 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
                       )}
                     </div>
                   ) : (
-                    <span className="text-sm text-zinc-400">Sin movimientos</span>
+                    <span className="text-sm text-zinc-500">Sin movimientos</span>
                   )}
                   <Badge tone={week.status === 'closed' ? 'green' : 'amber'}>
                     {week.status === 'closed' ? 'Cerrada' : 'Abierta'}

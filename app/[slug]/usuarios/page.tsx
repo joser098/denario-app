@@ -8,6 +8,8 @@ import { ActionForm, SubmitButton } from '@/components/form';
 import { CopyField } from '@/components/copy-field';
 import { Badge, Card, EmptyState, Field, Input, PageHeader, Select } from '@/components/ui';
 
+export const metadata = { title: 'Usuarios' };
+
 const ASSIGNABLE = ['admin', 'treasurer', 'viewer'] as const;
 
 export default async function UsersPage(props: PageProps<'/[slug]/usuarios'>) {

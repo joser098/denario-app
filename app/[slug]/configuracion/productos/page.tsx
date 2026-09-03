@@ -10,7 +10,10 @@ import { listCurrencies } from '@/lib/currencies';
 import { ActionForm, SubmitButton } from '@/components/form';
 import { ModalButton } from '@/components/modal';
 import { MoveButtons } from '@/components/reorder';
+import { MoneyInput } from '@/components/money-input';
 import { Badge, Card, CurrencyOptions, EmptyState, Field, Input, Select } from '@/components/ui';
+
+export const metadata = { title: 'Productos' };
 
 export default async function ProductsSettingsPage(
   props: PageProps<'/[slug]/configuracion/productos'>,
@@ -19,12 +22,15 @@ export default async function ProductsSettingsPage(
   const { organization } = await requireOrg(slug);
 
   const supabase = await createClient();
-  const currencies = await listCurrencies(supabase);
-  const { data: products } = await supabase
-    .from('products')
-    .select('*')
-    .eq('organization_id', organization.id)
-    .order('sort_order');
+  // En paralelo: son dos consultas que no dependen una de la otra.
+  const [currencies, { data: products }] = await Promise.all([
+    listCurrencies(supabase),
+    supabase
+      .from('products')
+      .select('*')
+      .eq('organization_id', organization.id)
+      .order('sort_order'),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -40,7 +46,7 @@ export default async function ProductsSettingsPage(
               <Input name="name" required placeholder="Libro de estudio" />
             </Field>
             <Field label="Precio">
-              <Input name="price" inputMode="decimal" required placeholder="15000" />
+              <MoneyInput name="price" required placeholder="15.000" />
             </Field>
             <Field label="Moneda">
               <Select name="currency_code" defaultValue={organization.default_currency}>
@@ -69,11 +75,10 @@ export default async function ProductsSettingsPage(
                   <Input name="name" defaultValue={product.name} className="w-56" required />
                 </Field>
                 <Field label="Precio">
-                  <Input
+                  <MoneyInput
                     name="price"
-                    inputMode="decimal"
                     defaultValue={product.price}
-                    className="w-28"
+                    className="w-28 text-right"
                     required
                   />
                 </Field>

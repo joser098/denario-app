@@ -13,6 +13,8 @@ import { MoveButtons } from '@/components/reorder';
 import { Badge, Card, Field, Input, Select } from '@/components/ui';
 import { CONCEPT_KIND_LABELS } from '@/lib/weeks';
 
+export const metadata = { title: 'Conceptos' };
+
 function CurrencyChecks({ selected, codes }: { selected: string[]; codes: string[] }) {
   return (
     <fieldset className="flex flex-col gap-1.5 border-0 p-0">

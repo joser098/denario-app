@@ -26,14 +26,14 @@ export function MoveButtons({
       <form action={action}>
         {hidden}
         <input type="hidden" name="direction" value="up" />
-        <SubmitButton className="w-9 px-0" disabled={first} title="Subir">
+        <SubmitButton className="w-9 px-0" disabled={first} title="Subir" label="Subir">
           ↑
         </SubmitButton>
       </form>
       <form action={action}>
         {hidden}
         <input type="hidden" name="direction" value="down" />
-        <SubmitButton className="w-9 px-0" disabled={last} title="Bajar">
+        <SubmitButton className="w-9 px-0" disabled={last} title="Bajar" label="Bajar">
           ↓
         </SubmitButton>
       </form>

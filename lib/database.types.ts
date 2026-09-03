@@ -14,6 +14,7 @@ export type PurchaseStatus = 'pending' | 'approved' | 'rejected' | 'delivered';
 export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'paid';
 export type SalePaymentMethod = 'cash' | 'mercadopago';
 export type SalesSessionStatus = 'open' | 'closed';
+export type PlReportStatus = 'draft' | 'closed';
 
 // Las columnas con default (id, created_at, ...) son opcionales al insertar;
 // `Req` lista las que si son obligatorias.
@@ -365,6 +366,70 @@ export type Attachment = {
   created_at: string;
 };
 
+/**
+ * Profit & Loss report: uno por campus y por domingo. Los montos van en la
+ * moneda del campus, congelada al crearlo.
+ */
+export type PlReport = {
+  id: string;
+  organization_id: string;
+  campus_id: string;
+  service_date: string;
+  currency_code: string;
+  status: PlReportStatus;
+
+  rev_tithes_offerings: number;
+  rev_hf_operation_support: number;
+  rev_other_donations: number;
+  rev_conferences_events: number;
+  rev_commercial_activities: number;
+  rev_other_income: number;
+
+  exp_personnel: number;
+  exp_program: number;
+  exp_administration: number;
+  exp_facilities: number;
+  exp_facilities_loans: number;
+  exp_conferences_events: number;
+  exp_commercial_activities: number;
+  exp_assets_purchased: number;
+  exp_depreciation: number;
+
+  /** Las contribuciones se calculan con estos, guardados por fila. */
+  global_rate: number;
+  continental_rate: number;
+
+  attendance: number;
+  participants: number;
+  salvations: number;
+
+  notes: string | null;
+  /** El PDF congelado al cerrar. Null mientras es borrador. */
+  pdf_path: string | null;
+  created_by: string | null;
+  closed_at: string | null;
+  closed_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Cotizacion de una moneda contra el dolar, para un domingo. La carga un
+ * administrador y queda guardada: el consolidado de una semana vieja no se
+ * mueve porque el dolar cambio hoy.
+ */
+export type ExchangeRate = {
+  id: string;
+  organization_id: string;
+  currency_code: string;
+  service_date: string;
+  /** Cuantas unidades locales equivalen a UN dolar. Para pasar a USD se divide. */
+  units_per_usd: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MeetingAmountKind = 'offering' | 'sale' | 'income';
 
 /**
@@ -499,6 +564,14 @@ export type Database = {
       week_concepts: Table<WeekConcept, 'code' | 'name'>;
       weeks: Table<Week, 'organization_id' | 'campus_id' | 'start_date' | 'end_date'>;
       week_entries: Table<WeekEntry, 'week_id' | 'concept_id' | 'currency_code' | 'amount'>;
+      pl_reports: Table<
+        PlReport,
+        'organization_id' | 'campus_id' | 'service_date' | 'currency_code'
+      >;
+      exchange_rates: Table<
+        ExchangeRate,
+        'organization_id' | 'currency_code' | 'service_date' | 'units_per_usd'
+      >;
     };
     Views: {
       meeting_amounts: { Row: MeetingAmount; Relationships: [] };
@@ -557,6 +630,7 @@ export type Database = {
       purchase_status: PurchaseStatus;
       payment_status: PaymentStatus;
       sales_session_status: SalesSessionStatus;
+      pl_report_status: PlReportStatus;
     };
     CompositeTypes: Record<never, never>;
   };

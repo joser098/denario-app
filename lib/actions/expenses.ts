@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { canWrite, inCampus, requireOrg, type OrgContext } from '@/lib/auth';
+import { parseAmount } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/dates';
 import { EXPENSE_CONCEPTS, recordWeeklyExpense } from '@/lib/expenses';
@@ -26,12 +27,23 @@ const DENIED: FormState = { error: 'No tenés permiso para decidir sobre los gas
 /** Una solicitud de otro campus no existe para quien está acotado al suyo. */
 const NOT_MINE: FormState = { error: 'Esa solicitud no existe.' };
 
-function money(value: FormDataEntryValue | null): number {
-  return Number(String(value ?? '').replace(/\./g, '').replace(',', '.'));
-}
 
 function expensesPath(slug: string) {
   return `/${slug}/gastos`;
+}
+
+/**
+ * Lo que hay que refrescar cuando un gasto se cierra.
+ *
+ * No alcanza con la pantalla de Gastos: el egreso cae en el libro semanal del
+ * campus, y esa pantalla se quedaba mostrando el saldo de antes. El `layout`
+ * de Gastos no cambia con ninguna de estas acciones, asi que el alcance de
+ * pagina es suficiente.
+ */
+function revalidateExpense(slug: string, section = '') {
+  revalidatePath(`${expensesPath(slug)}${section}`);
+  revalidatePath(`/${slug}/semanal`);
+  revalidatePath(`/${slug}`);
 }
 
 /**
@@ -111,7 +123,7 @@ export async function deliverPurchase(_prev: FormState, formData: FormData): Pro
   const ctx = await writeContext(formData);
   if (!ctx) return DENIED;
 
-  const amount = money(formData.get('actual_amount'));
+  const amount = parseAmount(formData.get('actual_amount'));
   if (!Number.isFinite(amount) || amount <= 0) return { error: 'Poné cuánto salió en realidad.' };
 
   const id = String(formData.get('id'));
@@ -163,7 +175,7 @@ export async function deliverPurchase(_prev: FormState, formData: FormData): Pro
 
   if (error) return { error: error.message };
 
-  revalidatePath(expensesPath(ctx.organization.slug), 'layout');
+  revalidateExpense(ctx.organization.slug);
   return { message: 'Entregado. El gasto quedó cargado en el libro semanal.' };
 }
 
@@ -238,7 +250,7 @@ export async function payPaymentRequest(
   const ctx = await writeContext(formData);
   if (!ctx) return DENIED;
 
-  const amount = money(formData.get('actual_amount'));
+  const amount = parseAmount(formData.get('actual_amount'));
   if (!Number.isFinite(amount) || amount <= 0) return { error: 'Poné cuánto se pagó.' };
 
   const paymentMethodId = String(formData.get('payment_method_id') ?? '');
@@ -292,7 +304,7 @@ export async function payPaymentRequest(
 
   if (error) return { error: error.message };
 
-  revalidatePath(`${expensesPath(ctx.organization.slug)}/pagos`, 'layout');
+  revalidateExpense(ctx.organization.slug, '/pagos');
   return { message: 'Pagado. El gasto quedó cargado en el libro semanal.' };
 }
 
@@ -353,7 +365,7 @@ export async function requestBudgetPayment(
 
   if (linkError) return { error: linkError.message };
 
-  revalidatePath(expensesPath(ctx.organization.slug), 'layout');
+  revalidatePath(expensesPath(ctx.organization.slug));
   return { message: 'Solicitud de pago generada. Está pendiente en Pagos y transferencias.' };
 }
 
@@ -399,7 +411,7 @@ export async function registerCashPayment(
   const concept = String(formData.get('concept') ?? '').trim();
   if (concept.length < 3) return { error: 'Escribí en concepto de qué se paga.' };
 
-  const amount = money(formData.get('amount'));
+  const amount = parseAmount(formData.get('amount'));
   if (!Number.isFinite(amount) || amount <= 0) return { error: 'Poné cuánto se pagó.' };
 
   const supabase = await createClient();
@@ -446,7 +458,7 @@ export async function registerCashPayment(
     description: `Pago en efectivo — ${payee}`,
   });
 
-  revalidatePath(`${expensesPath(ctx.organization.slug)}/efectivo`, 'layout');
+  revalidateExpense(ctx.organization.slug, '/efectivo');
 
   if (recorded.error) {
     return {
@@ -508,6 +520,6 @@ export async function attachReceipt(_prev: FormState, formData: FormData): Promi
 
   if (saveError) return { error: saveError.message };
 
-  revalidatePath(expensesPath(ctx.organization.slug), 'layout');
+  revalidatePath(expensesPath(ctx.organization.slug));
   return { message: 'Comprobante adjuntado.' };
 }

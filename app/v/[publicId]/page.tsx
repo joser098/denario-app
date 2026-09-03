@@ -49,9 +49,11 @@ export default async function PublicSalesPage(props: PageProps<'/v/[publicId]'>)
 
   const header = (
     <header className="flex flex-col gap-1 text-center">
-      <p className="text-lg font-semibold tracking-tight text-zinc-900">
+      {/* La pantalla tiene que empezar por un encabezado de nivel 1: sin el,
+          el lector de pantalla no puede saltar al principio del contenido. */}
+      <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
         {sunday.campuses.organizations.name}
-      </p>
+      </h1>
       <p className="text-sm text-zinc-500">
         {sunday.campuses.name} · {formatLong(sunday.service_date)}
       </p>
@@ -262,11 +264,11 @@ export default async function PublicSalesPage(props: PageProps<'/v/[publicId]'>)
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-1 justify-center px-4 py-10">
+    <main className="flex flex-1 justify-center px-4 py-10">
       <div className="flex w-full max-w-md flex-col gap-6">
         {children}
-        <p className="text-center text-xs text-zinc-400">Denario</p>
+        <p className="text-center text-xs text-zinc-500">Denario</p>
       </div>
-    </div>
+    </main>
   );
 }

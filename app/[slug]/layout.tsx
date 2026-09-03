@@ -1,9 +1,34 @@
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { signOut } from '@/lib/actions/auth';
 import { canAdmin, requireOrg, ROLE_LABELS } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { logoUrl } from '@/lib/logo';
 import { Icon, SidebarNav, type NavItem } from '@/components/nav';
+
+/**
+ * El titulo de cada pantalla.
+ *
+ * Todas las pantallas de adentro decian "Denario", asi que la pestaña y el
+ * historial no distinguian ninguna — y con dos iglesias abiertas a la vez,
+ * tampoco cual era cual. El template pone el nombre de la organizacion y
+ * cada pagina solo declara su seccion.
+ */
+export async function generateMetadata(props: LayoutProps<'/[slug]'>): Promise<Metadata> {
+  const { slug } = await props.params;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('organizations')
+    .select('name')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  const name = data?.name ?? 'Denario';
+  // `template` aplica a los segmentos hijos; la pagina de este mismo
+  // segmento (el Resumen) cae en `default`, por eso lleva su nombre.
+  return { title: { template: `%s · ${name}`, default: `Resumen · ${name}` } };
+}
 
 export default async function OrgLayout(props: LayoutProps<'/[slug]'>) {
   const { slug } = await props.params;
@@ -14,6 +39,7 @@ export default async function OrgLayout(props: LayoutProps<'/[slug]'>) {
     { href: `/${slug}/domingos`, label: 'Domingos', icon: 'domingos' },
     { href: `/${slug}/semanal`, label: 'Semanal', icon: 'semanal' },
     { href: `/${slug}/gastos`, label: 'Gastos', icon: 'gastos' },
+    { href: `/${slug}/reportes`, label: 'Profit & Loss', icon: 'reportes' },
   ];
   if (canAdmin(role)) {
     items.push(
@@ -36,7 +62,6 @@ export default async function OrgLayout(props: LayoutProps<'/[slug]'>) {
                 width={36}
                 height={36}
                 className="size-9 shrink-0 rounded-full bg-white object-contain"
-                unoptimized
               />
             ) : (
               <span className="grid size-9 shrink-0 place-items-center rounded-full border border-navy-700 text-sm font-semibold text-white">

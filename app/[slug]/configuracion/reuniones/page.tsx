@@ -12,6 +12,8 @@ import { ModalButton } from '@/components/modal';
 import { MoveButtons } from '@/components/reorder';
 import { Badge, Card, EmptyState, Field, Input, Select } from '@/components/ui';
 
+export const metadata = { title: 'Reuniones' };
+
 export default async function MeetingsSettingsPage(
   props: PageProps<'/[slug]/configuracion/reuniones'>,
 ) {

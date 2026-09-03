@@ -9,6 +9,8 @@ import type { MeetingAmount } from '@/lib/database.types';
 import { ActionForm } from '@/components/form';
 import { Badge, Card, EmptyState, Field, Input, PageHeader, Select } from '@/components/ui';
 
+export const metadata = { title: 'Domingos' };
+
 export default async function SundaysPage(props: PageProps<'/[slug]/domingos'>) {
   const { slug } = await props.params;
   const { organization, campuses, campusId, role } = await requireOrg(slug);
@@ -104,7 +106,7 @@ export default async function SundaysPage(props: PageProps<'/[slug]/domingos'>) 
                 <div className="flex items-center gap-4">
                   <span className="text-sm tabular-nums text-zinc-900">
                     {isEmpty(totals.moved) ? (
-                      <span className="text-zinc-400">Sin movimientos</span>
+                      <span className="text-zinc-500">Sin movimientos</span>
                     ) : (
                       formatTotals(totals.total)
                     )}

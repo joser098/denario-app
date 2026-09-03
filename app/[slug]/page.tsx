@@ -139,7 +139,7 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
                   como que se conto y no entro plata. */}
               <p
                 className={`text-2xl font-semibold ${
-                  isEmpty(lastSummary.moved) ? 'text-zinc-400' : 'text-zinc-900'
+                  isEmpty(lastSummary.moved) ? 'text-zinc-500' : 'text-zinc-900'
                 }`}
               >
                 {isEmpty(lastSummary.moved) ? 'Sin movimientos' : formatTotals(lastTotals)}
@@ -180,7 +180,7 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
             </div>
           ) : (
             <div>
-              <p className="text-2xl font-semibold text-zinc-400">Sin movimientos</p>
+              <p className="text-2xl font-semibold text-zinc-500">Sin movimientos</p>
               <p className="text-xs text-zinc-500">{formatRange(week)}</p>
             </div>
           )}
@@ -319,7 +319,7 @@ function Column({
         >
           <span
             className={`absolute -top-5 left-1/2 -translate-x-1/2 text-[11px] tabular-nums whitespace-nowrap ${
-              loaded ? 'text-zinc-900' : 'text-zinc-400'
+              loaded ? 'text-zinc-900' : 'text-zinc-500'
             }`}
           >
             {loaded ? formatAmount(amount) : '—'}

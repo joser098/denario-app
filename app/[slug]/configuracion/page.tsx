@@ -12,6 +12,8 @@ import { TIMEZONES, timezoneLabel } from '@/lib/timezones';
 import { ActionForm, SubmitButton } from '@/components/form';
 import { Card, CurrencyOptions, Field, Input, Select } from '@/components/ui';
 
+export const metadata = { title: 'Organización' };
+
 export default async function OrganizationSettingsPage(
   props: PageProps<'/[slug]/configuracion'>,
 ) {
@@ -75,10 +77,9 @@ export default async function OrganizationSettingsPage(
                 width={80}
                 height={80}
                 className="size-20 object-contain"
-                unoptimized
               />
             ) : (
-              <span className="text-xs text-zinc-400">Sin logo</span>
+              <span className="text-xs text-zinc-500">Sin logo</span>
             )}
           </div>
 

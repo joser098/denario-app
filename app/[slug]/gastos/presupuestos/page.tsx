@@ -8,6 +8,8 @@ import { PAYMENT_STATUS_LABELS } from '@/lib/expenses';
 import { ActionForm, SubmitButton } from '@/components/form';
 import { Badge, Card, EmptyState, PageHeader } from '@/components/ui';
 
+export const metadata = { title: 'Presupuestos' };
+
 /**
  * Presupuestos presentados. Archivo, no flujo: acá no se aprueba ni se paga
  * nada, y por eso una fila no tiene estado. Lo único que sale de esta

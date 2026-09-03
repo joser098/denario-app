@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { canAdmin, canWrite, inCampus, requireOrg, type OrgContext } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { weekOf } from '@/lib/dates';
+import { parseAmount } from '@/lib/money';
 import type { FormState } from '@/lib/forms';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -23,11 +24,6 @@ const NOT_MINE: FormState = { error: 'Esa semana no existe.' };
 function fail(error: { message: string; code?: string }): FormState {
   if (error.code === '23505') return { error: 'Esa semana ya está abierta.' };
   return { error: error.message };
-}
-
-/** "1.234,50" y "1234.50" son la misma plata. */
-function money(value: FormDataEntryValue | null): number {
-  return Number(String(value ?? '').replace(/\./g, '').replace(',', '.'));
 }
 
 function weekPath(ctx: OrgContext, weekId: string) {
@@ -180,7 +176,7 @@ export async function addWeekEntry(_prev: FormState, formData: FormData): Promis
   const check = await openWeekRow(supabase, ctx, weekId);
   if ('error' in check) return { error: check.error };
 
-  const amount = money(formData.get('amount'));
+  const amount = parseAmount(formData.get('amount'));
   if (!Number.isFinite(amount) || amount < 0) return { error: 'Poné un monto válido.' };
 
   const { data: concept } = await supabase

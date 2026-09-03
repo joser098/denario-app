@@ -12,7 +12,10 @@ import { formatMoney } from '@/lib/money';
 import { PAYMENT_STATUS_LABELS } from '@/lib/expenses';
 import type { PaymentStatus } from '@/lib/database.types';
 import { ActionForm } from '@/components/form';
+import { MoneyInput } from '@/components/money-input';
 import { Alert, Badge, Card, CurrencyOptions, EmptyState, Field, Input, Select } from '@/components/ui';
+
+export const metadata = { title: 'Pagos y transferencias' };
 
 const TONES: Record<PaymentStatus, 'amber' | 'blue' | 'red' | 'green'> = {
   pending: 'amber',
@@ -27,8 +30,8 @@ export default async function PaymentsPage(props: PageProps<'/[slug]/gastos/pago
   const decides = canWrite(role);
 
   const supabase = await createClient();
-  const currencies = await listCurrencies(supabase);
-  const [{ data: requests }, { data: teams }, { data: methods }] = await Promise.all([
+  const [currencies, { data: requests }, { data: teams }, { data: methods }] = await Promise.all([
+    listCurrencies(supabase),
     supabase
       .from('payment_requests')
       .select('*')
@@ -189,11 +192,10 @@ export default async function PaymentsPage(props: PageProps<'/[slug]/gastos/pago
                   <input type="hidden" name="slug" value={slug} />
                   <input type="hidden" name="id" value={request.id} />
                   <Field label="Cuánto se pagó">
-                    <Input
+                    <MoneyInput
                       name="actual_amount"
-                      inputMode="decimal"
                       defaultValue={Number(request.estimated_amount)}
-                      className="w-40"
+                      className="w-40 text-right"
                       required
                     />
                   </Field>

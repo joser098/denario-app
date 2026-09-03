@@ -24,7 +24,10 @@ import {
 import { ActionForm, SubmitButton } from '@/components/form';
 import { CopyField } from '@/components/copy-field';
 import { CountForm } from '@/components/count-form';
+import { MoneyInput } from '@/components/money-input';
 import { Alert, Badge, Card, CurrencyOptions, EmptyState, Field, Input, PageHeader, Select } from '@/components/ui';
+
+export const metadata = { title: 'Reunión' };
 
 export default async function MeetingPage(
   props: PageProps<'/[slug]/domingos/[sundayId]/reuniones/[meetingId]'>,
@@ -33,7 +36,6 @@ export default async function MeetingPage(
   const { organization, campuses, role } = await requireOrg(slug);
 
   const supabase = await createClient();
-  const currencies = await listCurrencies(supabase);
   const { data: meeting } = await supabase
     .from('sunday_meetings')
     .select('*, sundays!inner(id, organization_id, campus_id, service_date, status)')
@@ -47,14 +49,14 @@ export default async function MeetingPage(
 
   if (!meeting || !sunday || sunday.organization_id !== organization.id) notFound();
 
-  const [
+  const [currencies, 
     { data: count },
     { data: voided },
     { data: sales },
     { data: incomes },
     { data: products },
-    { data: session },
-  ] = await Promise.all([
+    { data: session },] = await Promise.all([
+    listCurrencies(supabase),
     supabase
       .from('offering_counts')
       .select('*')
@@ -493,7 +495,7 @@ export default async function MeetingPage(
               <input type="hidden" name="slug" value={slug} />
               <input type="hidden" name="meeting_id" value={meetingId} />
               <Field label="Monto">
-                <Input name="amount" inputMode="decimal" className="w-36" required />
+                <MoneyInput name="amount" className="w-36 text-right" required />
               </Field>
               <Field label="Moneda">
                 <Select

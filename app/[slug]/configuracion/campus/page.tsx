@@ -7,6 +7,8 @@ import { ActionForm, SubmitButton } from '@/components/form';
 import { ModalButton } from '@/components/modal';
 import { Badge, Card, CurrencyOptions, Field, Input, Select } from '@/components/ui';
 
+export const metadata = { title: 'Campus' };
+
 export default async function CampusSettingsPage(
   props: PageProps<'/[slug]/configuracion/campus'>,
 ) {
@@ -16,12 +18,15 @@ export default async function CampusSettingsPage(
   // Aca listamos tambien los inactivos: desactivar un campus es reversible y
   // el admin tiene que poder volver a prenderlo.
   const supabase = await createClient();
-  const currencies = await listCurrencies(supabase);
-  const { data: campuses } = await supabase
-    .from('campuses')
-    .select('*')
-    .eq('organization_id', organization.id)
-    .order('name');
+  // En paralelo: son dos consultas que no dependen una de la otra.
+  const [currencies, { data: campuses }] = await Promise.all([
+    listCurrencies(supabase),
+    supabase
+      .from('campuses')
+      .select('*')
+      .eq('organization_id', organization.id)
+      .order('name'),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">

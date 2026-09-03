@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { parseAmount } from '@/lib/money';
 import type { FormState } from '@/lib/forms';
 
 /**
@@ -62,9 +63,6 @@ async function findTeam(supabase: Client, organizationId: string, teamId: string
   return data;
 }
 
-function money(value: FormDataEntryValue | null): number {
-  return Number(String(value ?? '').replace(/\./g, '').replace(',', '.'));
-}
 
 function requester(formData: FormData) {
   return {
@@ -149,7 +147,7 @@ export async function submitPurchaseRequest(
   const items = parseItems(formData);
   if (items.length === 0) return { error: 'Cargá al menos un ítem con su cantidad.' };
 
-  const estimated = money(formData.get('estimated_amount'));
+  const estimated = parseAmount(formData.get('estimated_amount'));
 
   const { data: created, error } = await supabase
     .from('purchase_requests')
@@ -199,7 +197,7 @@ export async function submitBudget(_prev: FormState, formData: FormData): Promis
   const description = String(formData.get('description') ?? '').trim();
   if (description.length < 5) return { error: 'Contá de qué es el presupuesto.' };
 
-  const estimated = money(formData.get('estimated_amount'));
+  const estimated = parseAmount(formData.get('estimated_amount'));
   if (!Number.isFinite(estimated) || estimated <= 0) return { error: 'Poné el monto del presupuesto.' };
 
   // El equipo es opcional: un presupuesto puede no salir de ningún ministerio.
@@ -251,7 +249,7 @@ export async function submitPaymentRequest(
   const description = String(formData.get('description') ?? '').trim();
   if (description.length < 5) return { error: 'Contá para qué es el pago.' };
 
-  const estimated = money(formData.get('estimated_amount'));
+  const estimated = parseAmount(formData.get('estimated_amount'));
   if (!Number.isFinite(estimated) || estimated <= 0) return { error: 'Poné el monto a pagar.' };
 
   const teamId = String(formData.get('team_id') ?? '');

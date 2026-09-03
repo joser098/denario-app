@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { canAdmin, canWrite, inCampus, requireOrg, type OrgContext } from '@/lib/auth';
+import { parseAmount } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 import { parseCountLines } from '@/lib/count-lines';
 import { campusCurrencies, listDenominations } from '@/lib/currencies';
@@ -32,9 +33,6 @@ function fail(error: { message: string; code?: string }): FormState {
   return { error: error.message };
 }
 
-function money(value: FormDataEntryValue | null): number {
-  return Number(String(value ?? '').replace(/\./g, '').replace(',', '.'));
-}
 
 function meetingPath(ctx: OrgContext, sundayId: string, meetingId: string) {
   return `/${ctx.organization.slug}/domingos/${sundayId}/reuniones/${meetingId}`;
@@ -499,7 +497,7 @@ export async function addIncome(_prev: FormState, formData: FormData): Promise<F
   const check = await openMeeting(supabase, ctx, meetingId);
   if ('error' in check) return { error: check.error };
 
-  const amount = money(formData.get('amount'));
+  const amount = parseAmount(formData.get('amount'));
   if (!Number.isFinite(amount) || amount <= 0) return { error: 'Poné un monto mayor a cero.' };
 
   const { error } = await supabase.from('meeting_incomes').insert({

@@ -11,6 +11,8 @@ import { ModalButton } from '@/components/modal';
 import { MoveButtons } from '@/components/reorder';
 import { Badge, Card, EmptyState, Field, Input } from '@/components/ui';
 
+export const metadata = { title: 'Medios de pago' };
+
 export default async function PaymentMethodsSettingsPage(
   props: PageProps<'/[slug]/configuracion/medios-de-pago'>,
 ) {

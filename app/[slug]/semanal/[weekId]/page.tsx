@@ -16,6 +16,8 @@ import { ActionForm, SubmitButton } from '@/components/form';
 import { WeekEntryForm } from '@/components/week-entry-form';
 import { Alert, Badge, Card, EmptyState, Field, PageHeader, Textarea } from '@/components/ui';
 
+export const metadata = { title: 'Semana' };
+
 export default async function WeekPage(props: PageProps<'/[slug]/semanal/[weekId]'>) {
   const { slug, weekId } = await props.params;
   const { organization, campuses, role } = await requireOrg(slug);
@@ -105,13 +107,17 @@ export default async function WeekPage(props: PageProps<'/[slug]/semanal/[weekId
           <table className="w-full min-w-lg text-sm">
             <thead>
               <tr className="border-b border-zinc-200 text-xs font-medium text-zinc-500">
-                <th className="px-5 py-3 text-left">Concepto</th>
+                <th scope="col" className="px-5 py-3 text-left">
+                  Concepto
+                </th>
                 {currencies.map((currency) => (
-                  <th key={currency} className="px-5 py-3 text-right">
+                  <th key={currency} scope="col" className="px-5 py-3 text-right">
                     {currency}
                   </th>
                 ))}
-                <th className="px-5 py-3 text-right">Movimientos</th>
+                <th scope="col" className="px-5 py-3 text-right">
+                  Movimientos
+                </th>
               </tr>
             </thead>
 

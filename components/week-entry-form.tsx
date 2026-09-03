@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useRef, useState } from 'react';
+import { MoneyInput } from '@/components/money-input';
 import { Alert, Button, Field, Input, Select } from '@/components/ui';
 import { EMPTY_STATE, type FormState } from '@/lib/forms';
 
@@ -99,7 +100,7 @@ export function WeekEntryForm({
           label="Monto"
           hint={concept.kind === 'expense' ? 'Se resta del saldo.' : undefined}
         >
-          <Input name="amount" inputMode="decimal" className="w-36" required />
+          <MoneyInput name="amount" className="w-36 text-right" required />
         </Field>
 
         {concept.has_movement_count ? (

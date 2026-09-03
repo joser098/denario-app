@@ -7,7 +7,10 @@ import { formatMoney } from '@/lib/money';
 import { PURCHASE_STATUS_LABELS } from '@/lib/expenses';
 import type { PurchaseStatus } from '@/lib/database.types';
 import { ActionForm } from '@/components/form';
+import { MoneyInput } from '@/components/money-input';
 import { Alert, Badge, Card, CurrencyOptions, EmptyState, Field, Input, Select } from '@/components/ui';
+
+export const metadata = { title: 'Compras' };
 
 const TONES: Record<PurchaseStatus, 'amber' | 'blue' | 'red' | 'green'> = {
   pending: 'amber',
@@ -23,8 +26,8 @@ export default async function PurchasesPage(props: PageProps<'/[slug]/gastos'>) 
   const decides = canWrite(role);
 
   const supabase = await createClient();
-  const currencies = await listCurrencies(supabase);
-  const [{ data: requests }, { data: teams }] = await Promise.all([
+  const [currencies, { data: requests }, { data: teams }] = await Promise.all([
+    listCurrencies(supabase),
     supabase
       .from('purchase_requests')
       .select('*')
@@ -159,7 +162,7 @@ export default async function PurchasesPage(props: PageProps<'/[slug]/gastos'>) 
                   <input type="hidden" name="slug" value={slug} />
                   <input type="hidden" name="id" value={request.id} />
                   <Field label="Cuánto salió">
-                    <Input name="actual_amount" inputMode="decimal" className="w-40" required />
+                    <MoneyInput name="actual_amount" className="w-40 text-right" required />
                   </Field>
                   <Field label="Moneda">
                     <Select

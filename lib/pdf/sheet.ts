@@ -8,6 +8,8 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf
  */
 
 const A4: [number, number] = [595.28, 841.89];
+/** La misma hoja acostada, para los cuadros con una columna por campus. */
+const A4_APAISADA: [number, number] = [A4[1], A4[0]];
 const MARGIN = 56;
 const INK = rgb(0.09, 0.09, 0.11);
 const MUTED = rgb(0.45, 0.45, 0.5);
@@ -56,32 +58,49 @@ export class Sheet {
     private readonly pdf: PDFDocument,
     private readonly regular: PDFFont,
     private readonly bold: PDFFont,
+    private readonly size: [number, number],
   ) {
-    this.page = pdf.addPage(A4);
-    this.y = A4[1] - MARGIN;
+    this.page = pdf.addPage(size);
+    this.y = size[1] - MARGIN;
   }
 
-  static async create(): Promise<Sheet> {
+  /**
+   * `landscape` para los cuadros anchos: el consolidado lleva una columna por
+   * campus, y en vertical cada una se angosta hasta cortar los montos.
+   */
+  static async create({ landscape = false } = {}): Promise<Sheet> {
     const pdf = await PDFDocument.create();
     const regular = await pdf.embedFont(StandardFonts.Helvetica);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-    return new Sheet(pdf, regular, bold);
+    return new Sheet(pdf, regular, bold, landscape ? A4_APAISADA : A4);
   }
 
+  /** Ancho util de la hoja. Todo layout deberia salir de aca y no de una constante. */
   get width() {
-    return A4[0] - MARGIN * 2;
+    return this.size[0] - MARGIN * 2;
   }
 
   /** Abre hoja nueva si no entran `space` puntos mas. */
   private ensure(space: number) {
     if (this.y - space < MARGIN) {
-      this.page = this.pdf.addPage(A4);
-      this.y = A4[1] - MARGIN;
+      this.page = this.pdf.addPage(this.size);
+      this.y = this.size[1] - MARGIN;
     }
   }
 
   gap(points = 12) {
     this.y -= points;
+  }
+
+  /**
+   * Pasa a hoja nueva si el bloque que viene no entra entero.
+   *
+   * `ensure` corta fila por fila, asi que un titulo de seccion podia quedar
+   * al pie de una hoja con una sola de sus filas y el resto en la siguiente.
+   * Quien dibuja el bloque sabe cuanto mide; esto le deja pedirlo.
+   */
+  reserve(points: number) {
+    this.ensure(points);
   }
 
   /**
@@ -98,7 +117,7 @@ export class Sheet {
     const box = image.scaleToFit(96, 48);
     this.page.drawImage(image, {
       x: MARGIN + this.width - box.width,
-      y: A4[1] - MARGIN - box.height,
+      y: this.size[1] - MARGIN - box.height,
       width: box.width,
       height: box.height,
     });

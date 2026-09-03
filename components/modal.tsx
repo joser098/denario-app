@@ -54,7 +54,7 @@ export function ModalButton({
               type="button"
               onClick={() => dialog.current?.close()}
               aria-label="Cerrar"
-              className="-mr-2 -mt-1 rounded-lg px-2 py-1 text-xl leading-none text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+              className="-mr-2 -mt-1 rounded-lg px-2 py-1 text-xl leading-none text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
             >
               ×
             </button>

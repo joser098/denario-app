@@ -22,6 +22,8 @@ import {
 import { ActionForm } from '@/components/form';
 import { Badge, Card, Field, PageHeader, Textarea } from '@/components/ui';
 
+export const metadata = { title: 'Domingo' };
+
 export default async function SundayPage(props: PageProps<'/[slug]/domingos/[sundayId]'>) {
   const { slug, sundayId } = await props.params;
   const { organization, campuses, role } = await requireOrg(slug);
@@ -81,13 +83,13 @@ export default async function SundayPage(props: PageProps<'/[slug]/domingos/[sun
         <div>
           <p className="text-xs font-medium text-zinc-500">Sobres</p>
           <p className="text-base tabular-nums text-zinc-900">
-            {finalized.length === 0 ? <span className="text-zinc-400">—</span> : envelopes}
+            {finalized.length === 0 ? <span className="text-zinc-500">—</span> : envelopes}
           </p>
           <p className="text-xs text-zinc-500">dato de control</p>
         </div>
         <div className="ml-auto text-right">
           <p className="text-xs font-medium text-zinc-500">Total del domingo</p>
-          <p className="text-[11px] text-zinc-400">sin contar ventas</p>
+          <p className="text-[11px] text-zinc-500">sin contar ventas</p>
           <p className="text-xl font-semibold tabular-nums text-zinc-900">
             {formatTotals(totals.total)}
           </p>
@@ -142,7 +144,7 @@ export default async function SundayPage(props: PageProps<'/[slug]/domingos/[sun
                   )}
                 </div>
                 {isEmpty(meetingTotals.moved) ? (
-                  <p className="text-base text-zinc-400">Sin movimientos</p>
+                  <p className="text-base text-zinc-500">Sin movimientos</p>
                 ) : (
                   <div>
                     <p className="text-lg font-semibold tabular-nums text-zinc-900">
@@ -219,7 +221,7 @@ function Amount({
     <div>
       <p className="text-xs font-medium text-zinc-500">{label}</p>
       <p className="text-base tabular-nums text-zinc-900">
-        {isEmpty(totals) ? <span className="text-zinc-400">—</span> : formatTotals(totals)}
+        {isEmpty(totals) ? <span className="text-zinc-500">—</span> : formatTotals(totals)}
       </p>
       {methods.length > 0 ? (
         <p className="text-xs text-zinc-500">

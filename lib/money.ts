@@ -39,6 +39,18 @@ export function currencySymbol(currency: string): string {
   return SYMBOLS[currency] ?? '';
 }
 
+/**
+ * "US$ 11.021,75" — con simbolo, sin el codigo al final.
+ *
+ * Solo para documentos donde la moneda esta dicha una vez y no cambia: en un
+ * cuadro entero en dolares, repetir "USD" en cada celda es ruido. En la app,
+ * donde ARS y USD conviven en la misma pantalla, va `formatMoney`.
+ */
+export function formatAmountWithSymbol(amount: number, currency: string): string {
+  const symbol = SYMBOLS[currency];
+  return symbol ? `${symbol} ${NUMBER.format(amount)}` : `${NUMBER.format(amount)} ${currency}`;
+}
+
 /** Agrupa montos por moneda. Nunca se suman entre si. */
 export function sumByCurrency(
   rows: Array<{ currency_code: string; amount?: number; subtotal?: number }>,
@@ -73,4 +85,49 @@ export function formatTotals(totals: Record<string, number>, separator = ' · ')
  */
 export function campusCurrencies(defaultCurrency: string): string[] {
   return defaultCurrency === 'USD' ? ['USD'] : [defaultCurrency, 'USD'];
+}
+
+// ============================================================
+// Montos que se tipean
+// ============================================================
+
+/**
+ * Lo que se va tipeando, agrupado: "1000000" -> "1.000.000".
+ *
+ * Un monto largo sin separadores hay que contarlo con el dedo para saber si
+ * son cien mil o un millon, y en una planilla de tesoreria ese error se paga
+ * caro. Se formatea mientras se escribe, no al salir del campo, porque el
+ * punto de agruparlo es leerlo mientras se carga.
+ *
+ * Formato es-AR: el punto agrupa miles y la coma separa decimales. Solo deja
+ * pasar digitos y una coma, asi que no hay forma de tipear algo que despues
+ * `parseAmount` lea distinto.
+ */
+export function formatAmountInput(raw: string): string {
+  const limpio = raw.replace(/[^\d,]/g, '');
+  const [entero = '', ...resto] = limpio.split(',');
+  const agrupado = entero.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+  if (resto.length === 0) return agrupado;
+  // Una sola coma, dos decimales: es plata.
+  return `${agrupado},${resto.join('').slice(0, 2)}`;
+}
+
+/** Un numero del modelo, listo para editar: 1000.5 -> "1.000,5". */
+export function toAmountInput(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '';
+  const numero = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numero) || numero === 0) return '';
+  return formatAmountInput(NUMBER.format(numero));
+}
+
+/**
+ * "1.234,50" -> 1234.5. La contracara exacta de `formatAmountInput`.
+ *
+ * Vive aca y no en cada archivo de acciones porque estaba copiada en siete
+ * lugares y dos de esas copias no sacaban los puntos: con separadores de
+ * miles, "1.000" les daba 1.
+ */
+export function parseAmount(value: FormDataEntryValue | string | null): number {
+  return Number(String(value ?? '').replace(/\./g, '').replace(',', '.'));
 }

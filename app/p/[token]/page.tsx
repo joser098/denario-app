@@ -9,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { campusCurrencies, listCurrencies } from '@/lib/currencies';
 import { ActionForm } from '@/components/form';
 import { ItemRows } from '@/components/item-rows';
+import { MoneyInput } from '@/components/money-input';
 import { Alert, Card, CurrencyOptions, Field, Input, Select, Textarea } from '@/components/ui';
 
 export const metadata = { title: 'Pedido a tesorería · Denario' };
@@ -33,7 +34,6 @@ export default async function PublicRequestPage(props: PageProps<'/p/[token]'>) 
   const kind = kindOf(tipo);
 
   const supabase = createAdminClient();
-  const catalog = await listCurrencies(supabase);
   const { data: campus } = await supabase
     .from('campuses')
     .select('id, name, organization_id, default_currency, organizations!inner(name, is_active)')
@@ -53,6 +53,18 @@ export default async function PublicRequestPage(props: PageProps<'/p/[token]'>) 
     );
   }
 
+  // El campus tiene que resolverse primero porque todo lo demas cuelga de el,
+  // pero el catalogo y los equipos no dependen entre si: van juntos.
+  const [catalog, { data: teams }] = await Promise.all([
+    listCurrencies(supabase),
+    supabase
+      .from('teams')
+      .select('id, name')
+      .eq('organization_id', campus.organization_id)
+      .eq('is_active', true)
+      .order('sort_order'),
+  ]);
+
   // Solo lo que maneja este campus: pedir plata en una moneda que la
   // tesoreria de ese campus no usa no le sirve a nadie.
   const codes = campusCurrencies(campus.default_currency);
@@ -60,24 +72,20 @@ export default async function PublicRequestPage(props: PageProps<'/p/[token]'>) 
     .map((code) => catalog.find((c) => c.code === code))
     .filter((c) => c !== undefined);
 
-  const { data: teams } = await supabase
-    .from('teams')
-    .select('id, name')
-    .eq('organization_id', campus.organization_id)
-    .eq('is_active', true)
-    .order('sort_order');
-
   const contact = (
     <>
+      {/* autoComplete deja que el telefono ofrezca los datos que ya tiene:
+          es WCAG 1.3.5 y, en la practica, la diferencia entre tipear tres
+          campos en un celular y tocar una sugerencia. */}
       <Field label="Tu nombre">
-        <Input name="requester_name" required />
+        <Input name="requester_name" autoComplete="name" required />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Email" hint="Opcional.">
-          <Input name="requester_email" type="email" />
+          <Input name="requester_email" type="email" autoComplete="email" />
         </Field>
         <Field label="Teléfono" hint="Opcional.">
-          <Input name="requester_phone" />
+          <Input name="requester_phone" type="tel" autoComplete="tel" />
         </Field>
       </div>
     </>
@@ -155,7 +163,7 @@ export default async function PublicRequestPage(props: PageProps<'/p/[token]'>) 
                   <Textarea name="description" required placeholder="Arreglo del aire del salón." />
                 </Field>
                 <Field label="Monto presupuestado">
-                  <Input name="estimated_amount" inputMode="decimal" required />
+                  <MoneyInput name="estimated_amount" required />
                 </Field>
                 {currency}
                 {quote('Presupuesto')}
@@ -178,7 +186,7 @@ export default async function PublicRequestPage(props: PageProps<'/p/[token]'>) 
                   <Textarea name="description" required placeholder="Pago del service del aire." />
                 </Field>
                 <Field label="Monto a pagar">
-                  <Input name="estimated_amount" inputMode="decimal" required />
+                  <MoneyInput name="estimated_amount" required />
                 </Field>
                 {currency}
                 {quote('Comprobante o factura')}
@@ -204,7 +212,7 @@ export default async function PublicRequestPage(props: PageProps<'/p/[token]'>) 
                 </Field>
                 <ItemRows />
                 <Field label="Monto estimado" hint="Opcional, si tenés una idea.">
-                  <Input name="estimated_amount" inputMode="decimal" />
+                  <MoneyInput name="estimated_amount" />
                 </Field>
                 {currency}
               </ActionForm>
@@ -231,11 +239,11 @@ function Tab({ href, active, children }: { href: string; active: boolean; childr
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-1 justify-center px-4 py-10">
+    <main className="flex flex-1 justify-center px-4 py-10">
       <div className="flex w-full max-w-lg flex-col gap-6">
         {children}
-        <p className="text-center text-xs text-zinc-400">Denario</p>
+        <p className="text-center text-xs text-zinc-500">Denario</p>
       </div>
-    </div>
+    </main>
   );
 }

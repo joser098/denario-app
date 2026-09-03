@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useRef, type ReactNode } from 'react';
+import { useActionState, useRef, type ReactNode, type RefObject } from 'react';
 import { useFormStatus } from 'react-dom';
 import { EMPTY_STATE, type FormState } from '@/lib/forms';
 import { Alert, Button, buttonClass } from '@/components/ui';
@@ -83,32 +83,100 @@ export function SubmitButton({
   confirm,
   disabled = false,
   title,
+  label,
 }: {
   children: ReactNode;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   className?: string;
-  /** Texto del confirm() del navegador. Solo para acciones destructivas. */
+  /** Texto de la confirmacion. Solo para acciones destructivas. */
   confirm?: string;
   disabled?: boolean;
   title?: string;
+  /**
+   * Nombre accesible, para los botones cuyo contenido es un simbolo. Sin
+   * esto, una flecha "↑" le llega al lector de pantalla como "flecha arriba"
+   * y no como "subir".
+   */
+  label?: string;
 }) {
   const { pending } = useFormStatus();
+  const dialog = useRef<HTMLDialogElement>(null);
 
+  const common = {
+    title,
+    'aria-label': label,
+    disabled: pending || disabled,
+    className: buttonClass(variant, className),
+  };
+
+  const content = pending ? '…' : children;
+
+  if (!confirm) {
+    return (
+      <button type="submit" {...common}>
+        {content}
+      </button>
+    );
+  }
+
+  // El confirm() del navegador bloquea el hilo, no se puede estilar y en el
+  // telefono aparece como un cartel del sistema que no se parece en nada a la
+  // app. El <dialog> nativo ya trae foco atrapado y cierre con Escape.
   return (
-    <button
-      type="submit"
-      title={title}
-      disabled={pending || disabled}
-      onClick={
-        confirm
-          ? (event) => {
-              if (!window.confirm(confirm)) event.preventDefault();
-            }
-          : undefined
-      }
-      className={buttonClass(variant, className)}
+    <>
+      <button type="button" onClick={() => dialog.current?.showModal()} {...common}>
+        {content}
+      </button>
+
+      <ConfirmDialog dialog={dialog} message={confirm} variant={variant} />
+    </>
+  );
+}
+
+/**
+ * La confirmacion de una accion destructiva.
+ *
+ * Vive dentro del mismo <form>, asi que su boton de confirmar es un submit
+ * comun y no hace falta disparar el envio a mano.
+ */
+export function ConfirmDialog({
+  dialog,
+  message,
+  variant = 'danger',
+  formAction,
+}: {
+  dialog: RefObject<HTMLDialogElement | null>;
+  message: string;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  /** Cuando confirmar dispara una accion distinta a la del formulario. */
+  formAction?: (data: FormData) => void;
+}) {
+  return (
+    <dialog
+      ref={dialog}
+      aria-label="Confirmar"
+      className="m-auto w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-zinc-200 bg-white p-0 shadow-xl backdrop:bg-navy-950/50"
     >
-      {pending ? '…' : children}
-    </button>
+      <div className="flex flex-col gap-5 p-6">
+        <p className="text-sm text-zinc-700">{message}</p>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => dialog.current?.close()}
+            className={buttonClass('secondary')}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            formAction={formAction}
+            onClick={() => dialog.current?.close()}
+            className={buttonClass(variant === 'ghost' ? 'danger' : variant)}
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </dialog>
   );
 }

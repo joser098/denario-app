@@ -6,6 +6,8 @@ import { ModalButton } from '@/components/modal';
 import { MoveButtons } from '@/components/reorder';
 import { Badge, Card, EmptyState, Field, Input } from '@/components/ui';
 
+export const metadata = { title: 'Equipos' };
+
 export default async function TeamsSettingsPage(
   props: PageProps<'/[slug]/configuracion/equipos'>,
 ) {
