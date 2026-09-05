@@ -58,16 +58,17 @@ export function ActionForm({
       {state.message ? <Alert tone="success">{state.message}</Alert> : null}
 
       {done ? null : (
-        <>
-          <fieldset disabled={pending} className={`min-w-0 border-0 p-0 ${fieldsClassName}`}>
-            {children}
-            <Button type="submit" variant={submitVariant} disabled={pending}>
-              {pending ? 'Guardando…' : submitLabel}
-            </Button>
-          </fieldset>
-          {footer}
-        </>
+        <fieldset disabled={pending} className={`min-w-0 border-0 p-0 ${fieldsClassName}`}>
+          {children}
+          <Button type="submit" variant={submitVariant} disabled={pending}>
+            {pending ? 'Guardando…' : submitLabel}
+          </Button>
+        </fieldset>
       )}
+
+      {/* El footer sobrevive al exito: es donde viven las salidas ("¿Ya tenés
+          cuenta? Ingresar"). Ocultarlo dejaba al alta terminada sin a donde ir. */}
+      {footer}
     </form>
   );
 }

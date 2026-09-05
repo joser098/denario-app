@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { acceptInvitation } from '@/lib/actions/organizations';
 import { signOut } from '@/lib/actions/auth';
+import { authHref } from '@/lib/auth-links';
 import { getUser, ROLE_LABELS } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { ActionForm } from '@/components/form';
@@ -87,13 +88,13 @@ export default async function InvitationPage(props: PageProps<'/invitacion/[toke
         </p>
         <div className="flex flex-col gap-2">
           <Link
-            href={`/signup?next=${encodeURIComponent(next)}`}
+            href={authHref('/signup', next, invitation.email)}
             className="inline-flex h-10 items-center justify-center rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-700"
           >
             Crear cuenta
           </Link>
           <Link
-            href={`/login?next=${encodeURIComponent(next)}`}
+            href={authHref('/login', next, invitation.email)}
             className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-300 px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
           >
             Ya tengo cuenta

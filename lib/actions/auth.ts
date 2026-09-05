@@ -66,9 +66,17 @@ export async function signUp(_prev: FormState, formData: FormData): Promise<Form
     return { error: error.message };
   }
 
-  // Con confirmacion de email activada no hay sesion todavia.
+  // Sin sesion pasan dos cosas distintas y Supabase las devuelve igual, a
+  // proposito: o la cuenta es nueva y falta confirmar el mail, o el email ya
+  // tenia cuenta (ahi manda `identities` vacio y ningun error). Decir cual es
+  // seria confirmarle a un desconocido que ese email esta registrado, la
+  // misma razon por la que signIn no distingue sus errores. Asi que el
+  // mensaje cubre los dos casos y en ambos la salida es la misma pantalla.
   if (!data.session) {
-    return { message: 'Te mandamos un mail para confirmar la cuenta. Revisa tu bandeja.' };
+    return {
+      message:
+        'Si el email no tenía cuenta, te llega un mail para confirmarla. Si ya tenías, entrá con tu contraseña.',
+    };
   }
 
   redirect(next);

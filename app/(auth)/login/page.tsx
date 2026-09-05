@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { signIn } from '@/lib/actions/auth';
+import { authHref, param } from '@/lib/auth-links';
 import { ActionForm } from '@/components/form';
 import { Alert, Field, Input } from '@/components/ui';
 
@@ -11,13 +12,12 @@ const LINK_ERRORS: Record<string, string> = {
 export const metadata = { title: 'Ingresar · Denario' };
 
 export default async function LoginPage(props: PageProps<'/login'>) {
-  const { next, error } = await props.searchParams;
-  const linkError = typeof error === 'string' ? LINK_ERRORS[error] : undefined;
-  const nextPath = typeof next === 'string' ? next : '/';
-  // Cruzar a "Crear cuenta" no puede perder el destino: si viniste de una
-  // invitacion y lo perdes, al entrar caes en /nueva-organizacion.
-  const signupHref =
-    nextPath === '/' ? '/signup' : `/signup?next=${encodeURIComponent(nextPath)}`;
+  const { next, error, email } = await props.searchParams;
+  const linkError = param(error) ? LINK_ERRORS[param(error)!] : undefined;
+  const nextPath = param(next) ?? '/';
+  // Viene de una invitacion: el email ya esta decidido y no se toca. Entrar
+  // con otra cuenta no serviria, la invitacion es para esta.
+  const invitedEmail = param(email);
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,18 +36,39 @@ export default async function LoginPage(props: PageProps<'/login'>) {
             <Link href="/recuperar" className="text-zinc-500 hover:text-zinc-900">
               Olvidé mi contraseña
             </Link>
-            <Link href={signupHref} className="font-medium text-zinc-900 hover:underline">
+            <Link
+              href={authHref('/signup', nextPath, invitedEmail)}
+              className="font-medium text-zinc-900 hover:underline"
+            >
               Crear cuenta
             </Link>
           </div>
         }
       >
         <input type="hidden" name="next" value={nextPath} />
-        <Field label="Email">
-          <Input name="email" type="email" autoComplete="email" required autoFocus />
+        <Field
+          label="Email"
+          hint={invitedEmail ? 'La invitación es para este email.' : undefined}
+        >
+          <Input
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            autoFocus={!invitedEmail}
+            defaultValue={invitedEmail}
+            readOnly={Boolean(invitedEmail)}
+            className={invitedEmail ? 'bg-zinc-50 text-zinc-500' : ''}
+          />
         </Field>
         <Field label="Contraseña">
-          <Input name="password" type="password" autoComplete="current-password" required />
+          <Input
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            autoFocus={Boolean(invitedEmail)}
+          />
         </Field>
       </ActionForm>
     </div>
