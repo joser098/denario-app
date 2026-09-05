@@ -1,5 +1,4 @@
-import { redirect } from 'next/navigation';
-import { canAdmin, requireOrg, ROLE_LABELS } from '@/lib/auth';
+import { requireAdminOrg, ROLE_LABELS } from '@/lib/auth';
 import { inviteMember, removeMember, revokeInvitation, updateMember } from '@/lib/actions/settings';
 import { createClient } from '@/lib/supabase/server';
 import { formatShort } from '@/lib/dates';
@@ -14,10 +13,8 @@ const ASSIGNABLE = ['admin', 'treasurer', 'viewer'] as const;
 
 export default async function UsersPage(props: PageProps<'/[slug]/usuarios'>) {
   const { slug } = await props.params;
-  const { organization, campuses, userId, role } = await requireOrg(slug);
-
   // Quien no administra no gestiona accesos.
-  if (!canAdmin(role)) redirect(`/${slug}`);
+  const { organization, campuses, userId } = await requireAdminOrg(slug);
 
   const supabase = await createClient();
   const origin = await siteOrigin();

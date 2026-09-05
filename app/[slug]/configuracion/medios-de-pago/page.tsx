@@ -1,4 +1,4 @@
-import { requireOrg } from '@/lib/auth';
+import { requireAdminOrg } from '@/lib/auth';
 import {
   createPaymentMethod,
   movePaymentMethod,
@@ -17,7 +17,7 @@ export default async function PaymentMethodsSettingsPage(
   props: PageProps<'/[slug]/configuracion/medios-de-pago'>,
 ) {
   const { slug } = await props.params;
-  const { organization } = await requireOrg(slug);
+  const { organization } = await requireAdminOrg(slug);
 
   const supabase = await createClient();
   const { data: methods } = await supabase

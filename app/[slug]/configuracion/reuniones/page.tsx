@@ -1,4 +1,4 @@
-import { requireOrg } from '@/lib/auth';
+import { requireAdminOrg } from '@/lib/auth';
 import {
   createMeetingTemplate,
   moveMeetingTemplate,
@@ -18,7 +18,7 @@ export default async function MeetingsSettingsPage(
   props: PageProps<'/[slug]/configuracion/reuniones'>,
 ) {
   const { slug } = await props.params;
-  const { organization, campuses } = await requireOrg(slug);
+  const { organization, campuses } = await requireAdminOrg(slug);
 
   const supabase = await createClient();
   const { data: templates } = await supabase

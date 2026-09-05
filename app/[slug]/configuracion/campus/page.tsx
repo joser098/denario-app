@@ -1,4 +1,4 @@
-import { requireOrg } from '@/lib/auth';
+import { requireAdminOrg } from '@/lib/auth';
 import { createCampus, toggleCampus, updateCampus } from '@/lib/actions/settings';
 import { createClient } from '@/lib/supabase/server';
 import { listCurrencies } from '@/lib/currencies';
@@ -13,7 +13,7 @@ export default async function CampusSettingsPage(
   props: PageProps<'/[slug]/configuracion/campus'>,
 ) {
   const { slug } = await props.params;
-  const { organization } = await requireOrg(slug);
+  const { organization } = await requireAdminOrg(slug);
 
   // Aca listamos tambien los inactivos: desactivar un campus es reversible y
   // el admin tiene que poder volver a prenderlo.

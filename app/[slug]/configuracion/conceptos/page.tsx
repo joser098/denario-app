@@ -1,4 +1,4 @@
-import { requireOrg } from '@/lib/auth';
+import { requireAdminOrg } from '@/lib/auth';
 import {
   createWeekConcept,
   moveWeekConcept,
@@ -41,7 +41,7 @@ export default async function ConceptsSettingsPage(
   props: PageProps<'/[slug]/configuracion/conceptos'>,
 ) {
   const { slug } = await props.params;
-  const { organization } = await requireOrg(slug);
+  const { organization } = await requireAdminOrg(slug);
 
   const supabase = await createClient();
   const codes = await listCurrencyCodes(supabase);

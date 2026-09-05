@@ -97,6 +97,20 @@ export async function requireOrg(slug: string): Promise<OrgContext> {
 }
 
 /**
+ * Igual que requireOrg pero ademas exige rol de admin.
+ *
+ * Tiene que estar en la pagina, no solo en el layout: en App Router el layout
+ * y la pagina se renderizan en paralelo, asi que un redirect en el layout no
+ * frena a la pagina y su markup termina viajando igual en la respuesta. El
+ * guard del layout se queda (decide las pestañas), pero el que corta es este.
+ */
+export async function requireAdminOrg(slug: string): Promise<OrgContext> {
+  const ctx = await requireOrg(slug);
+  if (!canAdmin(ctx.role)) redirect(`/${slug}`);
+  return ctx;
+}
+
+/**
  * Si el miembro puede tocar algo de ese campus. Un `null` es una fila que no
  * es de ningun campus: la ve solo quien no esta acotado a uno.
  *

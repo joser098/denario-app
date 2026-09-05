@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { requireOrg } from '@/lib/auth';
+import { requireAdminOrg } from '@/lib/auth';
 import {
   removeOrganizationLogo,
   updateOrganization,
@@ -18,7 +18,7 @@ export default async function OrganizationSettingsPage(
   props: PageProps<'/[slug]/configuracion'>,
 ) {
   const { slug } = await props.params;
-  const { organization } = await requireOrg(slug);
+  const { organization } = await requireAdminOrg(slug);
   const currencies = await listCurrencies(await createClient());
   const logo = logoUrl(organization.logo_path);
 

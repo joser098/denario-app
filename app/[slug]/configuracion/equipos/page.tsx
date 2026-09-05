@@ -1,4 +1,4 @@
-import { requireOrg } from '@/lib/auth';
+import { requireAdminOrg } from '@/lib/auth';
 import { createTeam, moveTeam, toggleTeam, updateTeam } from '@/lib/actions/settings';
 import { createClient } from '@/lib/supabase/server';
 import { ActionForm, SubmitButton } from '@/components/form';
@@ -12,7 +12,7 @@ export default async function TeamsSettingsPage(
   props: PageProps<'/[slug]/configuracion/equipos'>,
 ) {
   const { slug } = await props.params;
-  const { organization } = await requireOrg(slug);
+  const { organization } = await requireAdminOrg(slug);
 
   const supabase = await createClient();
   const { data: teams } = await supabase

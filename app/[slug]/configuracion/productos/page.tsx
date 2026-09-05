@@ -1,4 +1,4 @@
-import { requireOrg } from '@/lib/auth';
+import { requireAdminOrg } from '@/lib/auth';
 import {
   createProduct,
   moveProduct,
@@ -19,7 +19,7 @@ export default async function ProductsSettingsPage(
   props: PageProps<'/[slug]/configuracion/productos'>,
 ) {
   const { slug } = await props.params;
-  const { organization } = await requireOrg(slug);
+  const { organization } = await requireAdminOrg(slug);
 
   const supabase = await createClient();
   // En paralelo: son dos consultas que no dependen una de la otra.
