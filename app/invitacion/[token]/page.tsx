@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { acceptInvitation } from '@/lib/actions/organizations';
+import { signOut } from '@/lib/actions/auth';
 import { getUser, ROLE_LABELS } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { ActionForm } from '@/components/form';
-import { Alert } from '@/components/ui';
+import { Alert, Button } from '@/components/ui';
 
 export const metadata = { title: 'Invitación · Denario' };
 
@@ -109,6 +110,14 @@ export default async function InvitationPage(props: PageProps<'/invitacion/[toke
         <Alert tone="error">
           Estás con la sesión de {user.email}. Cerrá sesión y entrá con {invitation.email}.
         </Alert>
+        {/* Decirle que cierre sesion y no darle como, lo deja buscando el boton
+            en una pantalla que no tiene menu. El next lo trae de vuelta aca. */}
+        <form action={signOut}>
+          <input type="hidden" name="next" value={`/invitacion/${token}`} />
+          <Button type="submit" variant="secondary" className="w-full">
+            Cerrar sesión
+          </Button>
+        </form>
       </>,
     );
   }

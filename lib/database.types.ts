@@ -619,6 +619,15 @@ export type Database = {
           accepted: boolean;
         }[];
       };
+      my_pending_invitations: {
+        Args: Record<string, never>;
+        Returns: {
+          token: string;
+          organization_name: string;
+          role: MemberRole;
+          expires_at: string;
+        }[];
+      };
     };
     Enums: {
       member_role: MemberRole;

@@ -7,6 +7,10 @@ export const metadata = { title: 'Crear cuenta · Denario' };
 
 export default async function SignupPage(props: PageProps<'/signup'>) {
   const { next } = await props.searchParams;
+  const nextPath = typeof next === 'string' ? next : '/';
+  // Ver login/page.tsx: el cruce entre las dos pantallas conserva el destino.
+  const loginHref =
+    nextPath === '/' ? '/login' : `/login?next=${encodeURIComponent(nextPath)}`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -24,13 +28,13 @@ export default async function SignupPage(props: PageProps<'/signup'>) {
         footer={
           <p className="text-center text-sm text-zinc-500">
             ¿Ya tenés cuenta?{' '}
-            <Link href="/login" className="font-medium text-zinc-900 hover:underline">
+            <Link href={loginHref} className="font-medium text-zinc-900 hover:underline">
               Ingresar
             </Link>
           </p>
         }
       >
-        <input type="hidden" name="next" value={typeof next === 'string' ? next : '/'} />
+        <input type="hidden" name="next" value={nextPath} />
         <Field label="Email">
           <Input name="email" type="email" autoComplete="email" required autoFocus />
         </Field>

@@ -13,6 +13,11 @@ export const metadata = { title: 'Ingresar · Denario' };
 export default async function LoginPage(props: PageProps<'/login'>) {
   const { next, error } = await props.searchParams;
   const linkError = typeof error === 'string' ? LINK_ERRORS[error] : undefined;
+  const nextPath = typeof next === 'string' ? next : '/';
+  // Cruzar a "Crear cuenta" no puede perder el destino: si viniste de una
+  // invitacion y lo perdes, al entrar caes en /nueva-organizacion.
+  const signupHref =
+    nextPath === '/' ? '/signup' : `/signup?next=${encodeURIComponent(nextPath)}`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -31,13 +36,13 @@ export default async function LoginPage(props: PageProps<'/login'>) {
             <Link href="/recuperar" className="text-zinc-500 hover:text-zinc-900">
               Olvidé mi contraseña
             </Link>
-            <Link href="/signup" className="font-medium text-zinc-900 hover:underline">
+            <Link href={signupHref} className="font-medium text-zinc-900 hover:underline">
               Crear cuenta
             </Link>
           </div>
         }
       >
-        <input type="hidden" name="next" value={typeof next === 'string' ? next : '/'} />
+        <input type="hidden" name="next" value={nextPath} />
         <Field label="Email">
           <Input name="email" type="email" autoComplete="email" required autoFocus />
         </Field>

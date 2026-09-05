@@ -127,8 +127,15 @@ export async function updatePassword(
 
 // ---------- Salir ----------
 
-export async function signOut() {
+/**
+ * `next` deja volver a donde estabas despues de cambiar de cuenta: la pantalla
+ * de invitacion lo usa para traerte de vuelta al token, en vez de dejarte en
+ * un login pelado que ya no sabe a que te habian invitado.
+ */
+export async function signOut(formData?: FormData) {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect('/login');
+
+  const next = safeNext(formData?.get('next') ?? null);
+  redirect(next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`);
 }
