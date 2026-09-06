@@ -7,7 +7,7 @@ import { ActionForm } from '@/components/form';
 import { Alert, CurrencyOptions, Field, Input, Select } from '@/components/ui';
 import { TIMEZONES, timezoneLabel } from '@/lib/timezones';
 
-export const metadata = { title: 'Nueva organización · Denario' };
+export const metadata = { title: 'Nueva organización' };
 
 export default async function NewOrganizationPage() {
   await requireUser();

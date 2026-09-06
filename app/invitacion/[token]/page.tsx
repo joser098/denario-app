@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { ActionForm } from '@/components/form';
 import { Alert, Button } from '@/components/ui';
 
-export const metadata = { title: 'Invitación · Denario' };
+export const metadata = { title: 'Invitación' };
 
 /**
  * Pantalla de aceptacion. La posesion del token es la autorizacion para ver

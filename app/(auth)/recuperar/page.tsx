@@ -3,7 +3,7 @@ import { requestPasswordReset } from '@/lib/actions/auth';
 import { ActionForm } from '@/components/form';
 import { Field, Input } from '@/components/ui';
 
-export const metadata = { title: 'Recuperar contraseña · Denario' };
+export const metadata = { title: 'Recuperar contraseña' };
 
 export default function RecoverPage() {
   return (

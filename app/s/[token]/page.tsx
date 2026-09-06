@@ -5,7 +5,7 @@ import { formatMoney } from '@/lib/money';
 import { PAYMENT_STATUS_LABELS, PURCHASE_STATUS_LABELS } from '@/lib/expenses';
 import { Alert, Badge, Card } from '@/components/ui';
 
-export const metadata = { title: 'Seguimiento del pedido · Denario' };
+export const metadata = { title: 'Seguimiento del pedido' };
 
 /**
  * Seguimiento público de una solicitud. El token es de la solicitud, no del

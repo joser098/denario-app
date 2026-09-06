@@ -2,7 +2,7 @@ import { updatePassword } from '@/lib/actions/auth';
 import { ActionForm } from '@/components/form';
 import { Field, Input } from '@/components/ui';
 
-export const metadata = { title: 'Nueva contraseña · Denario' };
+export const metadata = { title: 'Nueva contraseña' };
 
 /** Destino del link del mail de recuperacion, ya con la sesion canjeada. */
 export default function NewPasswordPage() {

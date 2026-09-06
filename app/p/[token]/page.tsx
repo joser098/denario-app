@@ -12,7 +12,7 @@ import { ItemRows } from '@/components/item-rows';
 import { MoneyInput } from '@/components/money-input';
 import { Alert, Card, CurrencyOptions, Field, Input, Select, Textarea } from '@/components/ui';
 
-export const metadata = { title: 'Pedido a tesorería · Denario' };
+export const metadata = { title: 'Pedido a tesorería' };
 
 const KINDS = ['compra', 'presupuesto', 'pago'] as const;
 type Kind = (typeof KINDS)[number];

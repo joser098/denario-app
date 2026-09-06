@@ -13,7 +13,7 @@ import { pdfName } from '@/lib/pdf/names';
 import { ActionForm, SubmitButton } from '@/components/form';
 import { Alert, Card, Field, Input, Select, Textarea } from '@/components/ui';
 
-export const metadata = { title: 'Caja de ventas · Denario' };
+export const metadata = { title: 'Caja de ventas' };
 
 /**
  * Superficie publica de ventas: la usa quien vende, desde el telefono y sin

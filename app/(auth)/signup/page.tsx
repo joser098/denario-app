@@ -4,7 +4,7 @@ import { authHref, param } from '@/lib/auth-links';
 import { ActionForm } from '@/components/form';
 import { Field, Input } from '@/components/ui';
 
-export const metadata = { title: 'Crear cuenta · Denario' };
+export const metadata = { title: 'Crear cuenta' };
 
 export default async function SignupPage(props: PageProps<'/signup'>) {
   const { next, email } = await props.searchParams;

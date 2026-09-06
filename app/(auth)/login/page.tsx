@@ -9,7 +9,7 @@ const LINK_ERRORS: Record<string, string> = {
   'link-vencido': 'Ese link ya venció o se usó. Pedí uno nuevo.',
 };
 
-export const metadata = { title: 'Ingresar · Denario' };
+export const metadata = { title: 'Ingresar' };
 
 export default async function LoginPage(props: PageProps<'/login'>) {
   const { next, error, email } = await props.searchParams;

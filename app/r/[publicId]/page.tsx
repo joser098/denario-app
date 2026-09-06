@@ -8,7 +8,7 @@ import { ActionForm } from '@/components/form';
 import { CountSheet } from '@/components/count-sheet';
 import { Alert, Field, Input, Textarea } from '@/components/ui';
 
-export const metadata = { title: 'Conteo de la ofrenda · Denario' };
+export const metadata = { title: 'Conteo de la ofrenda' };
 
 /**
  * Superficie publica: la usa un voluntario desde el telefono, sin cuenta.
