@@ -48,8 +48,12 @@ export function NavTabs({ items }: { items: NavItem[] }) {
 export function SidebarNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
 
+  // En mobile es una tira horizontal que se desliza. En escritorio ocupa el
+  // alto que sobra entre el encabezado y el pie de la barra; solo aparece
+  // scroll si la pantalla es tan baja que los items no entran, y aun asi el
+  // pie con "Cerrar sesion" se queda en su lugar.
   return (
-    <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible lg:py-4">
+    <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-y-auto lg:py-4">
       {items.map((item) => {
         const active = isActive(pathname, item);
 

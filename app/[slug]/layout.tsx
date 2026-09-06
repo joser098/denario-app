@@ -52,7 +52,14 @@ export default async function OrgLayout(props: LayoutProps<'/[slug]'>) {
 
   return (
     <div className="flex min-h-full flex-1 flex-col lg:flex-row">
-      <aside className="flex flex-col bg-navy-900 lg:w-64 lg:shrink-0">
+      {/*
+        En escritorio la barra se clava al viewport: sin esto se iba con el
+        scroll de la pagina y "Cerrar sesion" quedaba abajo de todo, fuera de
+        la vista. `self-start` es necesario para que el stretch del flex no
+        pise la altura, que es lo que hace posible el sticky. En mobile la
+        barra va arriba y no cambia nada.
+      */}
+      <aside className="flex flex-col bg-navy-900 lg:sticky lg:top-0 lg:h-dvh lg:w-64 lg:shrink-0 lg:self-start">
         <div className="flex items-center justify-between gap-3 px-5 pb-4 pt-5 lg:pb-2">
           <Link href={`/${slug}`} className="flex min-w-0 items-center gap-3">
             {logo ? (
