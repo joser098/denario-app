@@ -17,9 +17,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         <Mark className="size-16 border-2 border-white/70 text-xl" />
 
         <div>
-          <p className="text-5xl font-bold tracking-tight">Tesorería clara.</p>
+          <p className="text-5xl font-bold tracking-tight">Administración de finanzas para Iglesias.</p>
           <p className="mt-4 max-w-sm text-lg text-white/75">
-            Las ofrendas de cada domingo y el libro semanal, en un solo lugar.
+            Gestiona tus finanzas de manera eficiente y transparente.
           </p>
         </div>
 
