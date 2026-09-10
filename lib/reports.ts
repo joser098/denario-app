@@ -11,7 +11,7 @@ import type { Campus, PlReport } from '@/lib/database.types';
  * alla se lee asi; el castellano es para quien lo carga.
  */
 export type ReportField = {
-  key: RevenueKey | ExpenseKey;
+  key: RevenueKey | ExpenseKey | FoundationKey;
   es: string;
   en: string;
 };
@@ -34,6 +34,13 @@ export type ExpenseKey =
   | 'exp_commercial_activities'
   | 'exp_assets_purchased'
   | 'exp_depreciation';
+
+export type FoundationKey =
+  | 'fnd_opening_balance'
+  | 'fnd_income'
+  | 'fnd_missional_expenses'
+  | 'fnd_church_operation_support'
+  | 'fnd_capital_expenditure';
 
 export const REVENUE_FIELDS: ReportField[] = [
   { key: 'rev_tithes_offerings', es: 'Diezmos y ofrendas', en: 'Tithes and Offerings' },
@@ -76,6 +83,47 @@ export const EXPENSE_FIELDS: ReportField[] = [
   { key: 'exp_depreciation', es: 'Depreciación', en: 'Depreciation' },
 ];
 
+/**
+ * El presupuesto de la Fundacion.
+ *
+ * Es una seccion aparte: no entra en el total de ingresos ni en el de
+ * egresos, ni en el superavit. Arranca del saldo inicial y cierra en el
+ * final.
+ *
+ * Los cinco renglones SUMAN al saldo final. Todavia no esta definido cual
+ * deberia restar, asi que los campos admiten negativos y quien carga pone el
+ * signo. Cuando se decida, se cambia `foundationClosing` y nada mas.
+ *
+ * `fnd_church_operation_support` se llama igual que el ingreso
+ * `rev_hf_operation_support` a proposito: son las dos patas de la misma
+ * plata, lo que la Fundacion da y lo que la iglesia recibe.
+ */
+export const FOUNDATION_FIELDS: ReportField[] = [
+  {
+    key: 'fnd_opening_balance',
+    es: 'Saldo inicial de la Fundación',
+    en: 'Hillsong Foundation O/Bal',
+  },
+  { key: 'fnd_income', es: 'Ingresos de la Fundación', en: 'HF Income' },
+  { key: 'fnd_missional_expenses', es: 'Gastos misionales', en: 'HF Missional Expenses' },
+  {
+    key: 'fnd_church_operation_support',
+    es: 'Apoyo a la operación de la iglesia',
+    en: 'HF Church Operation Support',
+  },
+  {
+    key: 'fnd_capital_expenditure',
+    es: 'Inversión en bienes de capital',
+    en: 'HF Capital Expenditure',
+  },
+];
+
+/** El renglon final de la seccion. No es un campo: se calcula. */
+export const FOUNDATION_CLOSING: Omit<ReportField, 'key'> = {
+  es: 'Saldo final de la Fundación',
+  en: 'Hillsong Foundation C/Bal',
+};
+
 /** "Otras donaciones (Other Donations)" */
 export function fieldLabel(field: ReportField): string {
   return `${field.es} (${field.en})`;
@@ -88,6 +136,8 @@ export const REPORT_STATUS_LABELS = {
 
 export type ReportTotals = {
   revenue: number;
+  /** Saldo final de la Fundacion (C/Bal). Aparte del superavit. */
+  foundationClosing: number;
   globalContribution: number;
   continentalContribution: number;
   expenses: number;
@@ -117,6 +167,9 @@ export function reportTotals(report: PlReport): ReportTotals {
 
   return {
     revenue: round(revenue),
+    // Por ahora los cinco suman. El dia que se defina cual resta, se cambia
+    // esta linea sola.
+    foundationClosing: round(sum(report, FOUNDATION_FIELDS)),
     globalContribution,
     continentalContribution,
     expenses,

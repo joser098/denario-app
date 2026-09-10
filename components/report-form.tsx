@@ -1,7 +1,14 @@
 'use client';
 
 import { useActionState, useRef, useState } from 'react';
-import { EXPENSE_FIELDS, REVENUE_FIELDS, formatPercent, type ReportField } from '@/lib/reports';
+import {
+  EXPENSE_FIELDS,
+  FOUNDATION_CLOSING,
+  FOUNDATION_FIELDS,
+  REVENUE_FIELDS,
+  formatPercent,
+  type ReportField,
+} from '@/lib/reports';
 import { formatMoney, parseAmount, toAmountInput } from '@/lib/money';
 import { EMPTY_STATE, type FormState } from '@/lib/forms';
 import { ConfirmDialog } from '@/components/form';
@@ -40,7 +47,7 @@ export function ReportForm({
 }) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      [...REVENUE_FIELDS, ...EXPENSE_FIELDS].map((field) => [
+      [...REVENUE_FIELDS, ...EXPENSE_FIELDS, ...FOUNDATION_FIELDS].map((field) => [
         field.key,
         toAmountInput(report[field.key]),
       ]),
@@ -60,8 +67,17 @@ export function ReportForm({
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
   };
 
+  /** El Foundation Budget admite negativos: ahi el signo es parte del dato. */
+  const signed = (raw: string) => {
+    const parsed = parseAmount(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   const sum = (fields: ReportField[]) =>
     fields.reduce((total, field) => total + num(values[field.key] ?? ''), 0);
+
+  const signedSum = (fields: ReportField[]) =>
+    fields.reduce((total, field) => total + signed(values[field.key] ?? ''), 0);
 
   const currency = report.currency_code;
   const revenue = sum(REVENUE_FIELDS);
@@ -69,18 +85,21 @@ export function ReportForm({
   const continentalContribution = revenue * Number(report.continental_rate);
   const expenses = sum(EXPENSE_FIELDS) + globalContribution + continentalContribution;
   const surplus = revenue - expenses;
+  // Los cinco suman, y el que tenga que restar se carga en negativo.
+  const foundationClosing = signedSum(FOUNDATION_FIELDS);
 
   const people = num(attendance);
   const joined = num(participants);
   const souls = num(salvations);
 
-  const amounts = (fields: ReportField[]) =>
+  const amounts = (fields: ReportField[], { negative = false } = {}) =>
     fields.map((field) => (
       <Cell key={field.key} es={field.es} en={field.en}>
         <MoneyInput
           name={field.key}
           defaultValue={report[field.key]}
           onValueChange={(next) => setValues((prev) => ({ ...prev, [field.key]: next }))}
+          allowNegative={negative}
           disabled={readOnly}
           compact
           className="text-right tabular-nums"
@@ -201,6 +220,25 @@ export function ReportForm({
           >
             {formatMoney(surplus, currency)}
           </span>
+        </Card>
+
+        {/* ---------- Foundation Budget ---------- */}
+        <Card className="flex flex-col gap-2.5 p-4">
+          <Heading>Presupuesto de la Fundación (Foundation Budget)</Heading>
+
+          <div className="grid gap-x-3 gap-y-2 sm:grid-cols-3 lg:grid-cols-5">
+            {amounts(FOUNDATION_FIELDS, { negative: true })}
+          </div>
+
+          <TotalBar
+            label={`${FOUNDATION_CLOSING.es} (${FOUNDATION_CLOSING.en})`}
+            value={formatMoney(foundationClosing, currency)}
+          />
+
+          <p className="text-[11px] text-zinc-500">
+            Por ahora los cinco renglones suman. El que tenga que restar, cargalo en negativo
+            (con el signo <span className="font-medium">−</span> adelante).
+          </p>
         </Card>
 
         {readOnly ? null : (

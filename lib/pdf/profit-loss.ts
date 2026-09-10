@@ -5,6 +5,8 @@ import { formatLong } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import {
   EXPENSE_FIELDS,
+  FOUNDATION_CLOSING,
+  FOUNDATION_FIELDS,
   REVENUE_FIELDS,
   fieldLabel,
   formatPercent,
@@ -116,6 +118,22 @@ export async function buildProfitLoss(
       { text: money(totals.surplus), width: AMOUNT, align: 'right', bold: true },
     ],
     { size: 12 },
+  );
+
+  // ---------- Foundation Budget ----------
+  // Va despues del superavit y no adentro de egresos: es otra plata, con su
+  // propio saldo de apertura y de cierre.
+  //
+  // La seccion entera se reserva: al pie de la hoja entraban el titulo y un
+  // renglon, y los otros cuatro mas el saldo final se iban a la hoja
+  // siguiente. Un saldo de cierre separado de sus partes no se puede leer.
+  sheet.reserve(150);
+  section(sheet, 'Presupuesto de la Fundación (Foundation Budget)');
+  for (const field of FOUNDATION_FIELDS) line(sheet, field, money(Number(report[field.key])));
+  total(
+    sheet,
+    `${FOUNDATION_CLOSING.es} (${FOUNDATION_CLOSING.en})`,
+    money(totals.foundationClosing),
   );
 
   if (report.notes) {

@@ -103,22 +103,31 @@ export function campusCurrencies(defaultCurrency: string): string[] {
  * pasar digitos y una coma, asi que no hay forma de tipear algo que despues
  * `parseAmount` lea distinto.
  */
-export function formatAmountInput(raw: string): string {
+export function formatAmountInput(raw: string, { negative = false } = {}): string {
+  // El menos solo cuenta al principio y solo donde esta permitido: el
+  // Foundation Budget admite montos en negativo, el resto del sistema no.
+  const signo = negative && raw.trimStart().startsWith('-') ? '-' : '';
   const limpio = raw.replace(/[^\d,]/g, '');
   const [entero = '', ...resto] = limpio.split(',');
   const agrupado = entero.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
-  if (resto.length === 0) return agrupado;
+  if (resto.length === 0) return `${signo}${agrupado}`;
   // Una sola coma, dos decimales: es plata.
-  return `${agrupado},${resto.join('').slice(0, 2)}`;
+  return `${signo}${agrupado},${resto.join('').slice(0, 2)}`;
 }
 
-/** Un numero del modelo, listo para editar: 1000.5 -> "1.000,5". */
+/**
+ * Un numero del modelo, listo para editar: 1000.5 -> "1.000,5".
+ *
+ * El signo se respeta siempre: si el valor guardado es negativo, mostrarlo en
+ * positivo seria mentir sobre lo que dice la fila. Que se pueda TIPEAR un
+ * negativo es otra cosa, y eso lo decide cada campo.
+ */
 export function toAmountInput(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === '') return '';
   const numero = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numero) || numero === 0) return '';
-  return formatAmountInput(NUMBER.format(numero));
+  return formatAmountInput(NUMBER.format(numero), { negative: true });
 }
 
 /**

@@ -400,6 +400,15 @@ export type PlReport = {
   exp_assets_purchased: number;
   exp_depreciation: number;
 
+  // Foundation Budget. Sin check de signo en la base: admiten negativos a
+  // proposito, para poder restar del saldo final mientras no este definido
+  // cual renglon suma y cual resta.
+  fnd_opening_balance: number;
+  fnd_income: number;
+  fnd_missional_expenses: number;
+  fnd_church_operation_support: number;
+  fnd_capital_expenditure: number;
+
   /** Las contribuciones se calculan con estos, guardados por fila. */
   global_rate: number;
   continental_rate: number;

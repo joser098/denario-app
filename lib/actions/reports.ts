@@ -6,7 +6,7 @@ import { canAdmin, canWrite, inCampus, requireOrg, type OrgContext } from '@/lib
 import { createClient } from '@/lib/supabase/server';
 import { parseAmount } from '@/lib/money';
 import { attachReportPdf } from '@/lib/pdf/profit-loss';
-import { EXPENSE_FIELDS, REVENUE_FIELDS } from '@/lib/reports';
+import { EXPENSE_FIELDS, FOUNDATION_FIELDS, REVENUE_FIELDS } from '@/lib/reports';
 import type { FormState } from '@/lib/forms';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -24,6 +24,15 @@ const NOT_MINE: FormState = { error: 'Ese reporte no existe.' };
 function money(value: FormDataEntryValue | null): number {
   const parsed = parseAmount(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+/**
+ * Lo mismo pero conservando el signo, para el Foundation Budget: ahi un
+ * negativo es un dato y no un error, porque es lo que resta del saldo final.
+ */
+function signedMoney(value: FormDataEntryValue | null): number {
+  const parsed = parseAmount(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 /** Asistencia, participacion, salvaciones. Llegan agrupadas: "2.000". */
@@ -126,10 +135,15 @@ export async function saveReport(_prev: FormState, formData: FormData): Promise<
     [...REVENUE_FIELDS, ...EXPENSE_FIELDS].map((field) => [field.key, money(formData.get(field.key))]),
   );
 
+  const foundation = Object.fromEntries(
+    FOUNDATION_FIELDS.map((field) => [field.key, signedMoney(formData.get(field.key))]),
+  );
+
   const { error } = await supabase
     .from('pl_reports')
     .update({
       ...amounts,
+      ...foundation,
       attendance,
       participants,
       salvations: count(formData.get('salvations')),
