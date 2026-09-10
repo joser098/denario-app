@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireAdminOrg } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { formatLong, formatTime } from '@/lib/dates';
+import { formatLong, formatStamp, formatTime, timezoneOf } from '@/lib/dates';
 import { Badge, Button, Card, EmptyState, Field, Input, PageHeader } from '@/components/ui';
 
 export const metadata = { title: 'Actas' };
@@ -45,11 +45,6 @@ type Acta = {
 
 const isDate = (value: unknown): value is string =>
   typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
-
-function stamp(iso: string | null): string | null {
-  if (!iso) return null;
-  return new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
-}
 
 /**
  * Todas las actas de la organizacion en una sola lista.
@@ -195,6 +190,10 @@ export default async function ActasPage(props: PageProps<'/[slug]/actas'>) {
   rows.sort((a, b) => b.date.localeCompare(a.date) || a.order - b.order);
 
   const campusName = (id: string) => campuses.find((c) => c.id === id)?.name ?? 'Campus';
+  // La hora de la firma se lee en la del campus que firmo, no en la del
+  // servidor: la lista mezcla campus y esta pagina se renderiza en el server.
+  const signedAt = (row: Acta) =>
+    formatStamp(row.at, timezoneOf(campuses.find((c) => c.id === row.campusId), organization));
   const manyCampuses = campuses.length > 1;
 
   return (
@@ -269,7 +268,7 @@ export default async function ActasPage(props: PageProps<'/[slug]/actas'>) {
               </div>
 
               <div className="flex items-center gap-4">
-                {row.at ? <span className="text-xs text-zinc-500">{stamp(row.at)}</span> : null}
+                {row.at ? <span className="text-xs text-zinc-500">{signedAt(row)}</span> : null}
                 {/*
                   Ver abre el PDF en una pestaña nueva: quien esta revisando
                   una tanda de actas no quiere perder la lista ni juntar

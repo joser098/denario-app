@@ -1,7 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
-import { formatLong } from '@/lib/dates';
+import { formatLong, formatStamp, timezoneOf } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import {
   EXPENSE_FIELDS,
@@ -45,10 +45,10 @@ export async function buildProfitLoss(
   const [{ data: organization }, { data: campus }] = await Promise.all([
     supabase
       .from('organizations')
-      .select('name, logo_path')
+      .select('name, logo_path, timezone')
       .eq('id', report.organization_id)
       .maybeSingle(),
-    supabase.from('campuses').select('name').eq('id', report.campus_id).maybeSingle(),
+    supabase.from('campuses').select('name, timezone').eq('id', report.campus_id).maybeSingle(),
   ]);
 
   if (!organization) return null;
@@ -144,7 +144,7 @@ export async function buildProfitLoss(
 
   sheet.footer([
     report.status === 'closed'
-      ? `Reporte cerrado el ${stamp(report.closed_at)}.`
+      ? `Reporte cerrado el ${formatStamp(report.closed_at, timezoneOf(campus, organization))}.`
       : 'Borrador: todavía se puede editar.',
     'Documento generado por Denario.',
   ]);
@@ -214,9 +214,4 @@ function metric(sheet: Sheet, label: string, value: string) {
 
 function percent(rate: number): string {
   return `${Number((Number(rate) * 100).toFixed(2))}%`;
-}
-
-function stamp(iso: string | null): string {
-  if (!iso) return '';
-  return new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 }

@@ -12,7 +12,7 @@ import {
 } from '@/lib/actions/sundays';
 import { createClient } from '@/lib/supabase/server';
 import { campusCurrencies, listCurrencies, listDenominations } from '@/lib/currencies';
-import { formatLong, formatTime } from '@/lib/dates';
+import { formatLong, formatTime, timezoneOf } from '@/lib/dates';
 import { formatMoney, formatTotals, sumByCurrency } from '@/lib/money';
 import { siteOrigin } from '@/lib/site';
 import {
@@ -527,7 +527,9 @@ export default async function MeetingPage(
                 <p className="text-sm text-zinc-900">{old.voided_reason}</p>
                 <p className="text-xs text-zinc-500">
                   Contó {old.volunteer_name ?? '—'} · anulada el{' '}
-                  {new Date(old.updated_at).toLocaleDateString('es-AR')}
+                  {new Date(old.updated_at).toLocaleDateString('es-AR', {
+                    timeZone: timezoneOf(campus, organization),
+                  })}
                 </p>
               </div>
             ))}

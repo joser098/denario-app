@@ -34,6 +34,20 @@ export function isoDayOfWeek(date: string): number {
   return day === 0 ? SUNDAY : day;
 }
 
+/**
+ * Zona horaria de ultimo recurso: la del campus manda, si no la tiene hereda
+ * la de la organizacion, y recien si faltan las dos se cae aca.
+ */
+export const DEFAULT_TIMEZONE = 'America/Argentina/Buenos_Aires';
+
+/** La del campus si tiene propia; si no, la de la organizacion. */
+export function timezoneOf(
+  campus: { timezone: string | null } | null | undefined,
+  organization: { timezone: string | null } | null | undefined,
+): string {
+  return campus?.timezone ?? organization?.timezone ?? DEFAULT_TIMEZONE;
+}
+
 /** Hoy segun la zona horaria de la organizacion, como `YYYY-MM-DD`. */
 export function todayIn(timezone: string): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -148,4 +162,22 @@ export function formatRange(range: DateRange): string {
 /** `"10:30:00"` -> `"10:30"` */
 export function formatTime(time: string): string {
   return time.slice(0, 5);
+}
+
+/**
+ * `"31/08/26 21:15"` — un instante, en la hora del campus.
+ *
+ * A diferencia del resto de este archivo, aca la hora importa: cuando se
+ * firmo un acta, cuando se cerro una caja. Son `timestamptz`, o sea instantes
+ * en UTC, y sin `timeZone` explicito se formatean con la del servidor —que en
+ * produccion es UTC— asi que un acta firmada el domingo 21:15 en Buenos Aires
+ * salia impresa como lunes 00:15.
+ */
+export function formatStamp(iso: string | null, timezone: string): string {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('es-AR', {
+    timeZone: timezone || DEFAULT_TIMEZONE,
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
 }

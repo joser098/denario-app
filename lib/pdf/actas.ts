@@ -1,7 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
-import { formatLong, formatTime } from '@/lib/dates';
+import { formatLong, formatStamp, formatTime, timezoneOf } from '@/lib/dates';
 import { DEFAULT_DOCUMENT_TYPE } from '@/lib/documents';
 import { formatMoney, formatTotals, sumByCurrency } from '@/lib/money';
 import { isEmpty, methodLabel, methodsOf, summarize, type Breakdown } from '@/lib/sundays';
@@ -25,11 +25,6 @@ const DECLARACION = [
   'Asimismo, declaran bajo juramento que los importes y datos consignados en la presente acta son ciertos y reflejan fielmente el conteo realizado, comprometiéndose a actuar con integridad, transparencia y buena fe, y a informar cualquier diferencia o irregularidad detectada.',
   'La firma del acta implica conformidad con lo aquí consignado, sin perjuicio de las responsabilidades legales que pudieran corresponder.',
 ];
-
-function stamp(iso: string | null): string {
-  if (!iso) return '';
-  return new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
-}
 
 /** Renglon chico con el desglose por medio de pago, si hay mas de uno. */
 function breakdownLine(sheet: Sheet, group: Breakdown) {
@@ -115,8 +110,8 @@ export async function buildCountActa(supabase: Client, countId: string): Promise
   if (!sunday) return null;
 
   const [{ data: org }, { data: campus }, { data: lines }] = await Promise.all([
-    supabase.from('organizations').select('name, logo_path').eq('id', sunday.organization_id).maybeSingle(),
-    supabase.from('campuses').select('name, document_type').eq('id', sunday.campus_id).maybeSingle(),
+    supabase.from('organizations').select('name, logo_path, timezone').eq('id', sunday.organization_id).maybeSingle(),
+    supabase.from('campuses').select('name, document_type, timezone').eq('id', sunday.campus_id).maybeSingle(),
     supabase.from('offering_count_lines').select('*').eq('offering_count_id', countId),
   ]);
 
@@ -204,7 +199,7 @@ export async function buildCountActa(supabase: Client, countId: string): Promise
   );
 
   sheet.footer([
-    `Acta ${count.public_id} · firmada el ${stamp(count.finalized_at)}`,
+    `Acta ${count.public_id} · firmada el ${formatStamp(count.finalized_at, timezoneOf(campus, org))}`,
     'Una vez firmada, esta acta no se edita: si hay un error se anula y se hace una nueva.',
     GENERATED_BY,
   ]);
@@ -233,8 +228,8 @@ export async function buildSundayActa(
 
   const [{ data: org }, { data: campus }, { data: meetings }, { data: amounts }] =
     await Promise.all([
-      supabase.from('organizations').select('name, logo_path').eq('id', sunday.organization_id).maybeSingle(),
-      supabase.from('campuses').select('name').eq('id', sunday.campus_id).maybeSingle(),
+      supabase.from('organizations').select('name, logo_path, timezone').eq('id', sunday.organization_id).maybeSingle(),
+      supabase.from('campuses').select('name, timezone').eq('id', sunday.campus_id).maybeSingle(),
       supabase.from('sunday_meetings').select('*').eq('sunday_id', sundayId).order('sort_order'),
       supabase.from('meeting_amounts').select('*').eq('sunday_id', sundayId),
     ]);
@@ -349,7 +344,10 @@ export async function buildSundayActa(
 
   sheet.signatures([{ role: 'Cerró el domingo', name: options.closedBy ?? '' }]);
 
-  sheet.footer([`Cerrado el ${stamp(sunday.closed_at)}`, GENERATED_BY]);
+  sheet.footer([
+    `Cerrado el ${formatStamp(sunday.closed_at, timezoneOf(campus, org))}`,
+    GENERATED_BY,
+  ]);
 
   return {
     path: `${sunday.organization_id}/${sunday.id}/cierre-${sunday.closed_at}.pdf`,
@@ -432,8 +430,8 @@ export async function buildCashboxActa(
   if (!sunday) return null;
 
   const [{ data: org }, { data: campus }, { data: sales }] = await Promise.all([
-    supabase.from('organizations').select('name, logo_path').eq('id', sunday.organization_id).maybeSingle(),
-    supabase.from('campuses').select('name').eq('id', sunday.campus_id).maybeSingle(),
+    supabase.from('organizations').select('name, logo_path, timezone').eq('id', sunday.organization_id).maybeSingle(),
+    supabase.from('campuses').select('name, timezone').eq('id', sunday.campus_id).maybeSingle(),
     supabase.from('sales').select('*').eq('session_id', sessionId).order('created_at'),
   ]);
 
@@ -523,7 +521,7 @@ export async function buildCashboxActa(
   ]);
 
   sheet.footer([
-    `Caja cerrada el ${stamp(session.closed_at)}`,
+    `Caja cerrada el ${formatStamp(session.closed_at, timezoneOf(campus, org))}`,
     'Las ventas no forman parte del acta de conteo de la ofrenda: es plata aparte.',
     GENERATED_BY,
   ]);
