@@ -77,7 +77,7 @@ export default async function SundayPage(props: PageProps<'/[slug]/domingos/[sun
       </div>
 
       <Card className="flex flex-wrap gap-x-10 gap-y-4 p-5">
-        <Amount label="Ofrendas" totals={totals.offering} />
+        <Amount label="Efectivo" totals={totals.offering} />
         <Amount label="Ventas" totals={totals.sales.total} breakdown={totals.sales} />
         <Amount label="Ingresos digitales" totals={totals.incomes.total} breakdown={totals.incomes} />
         <div>

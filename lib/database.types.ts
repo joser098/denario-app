@@ -15,6 +15,9 @@ export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'paid';
 export type SalePaymentMethod = 'cash' | 'mercadopago';
 export type SalesSessionStatus = 'open' | 'closed';
 export type PlReportStatus = 'draft' | 'closed';
+// Check de campuses.document_type, no un enum de Postgres. La lista con el
+// pais y el nombre largo esta en lib/documents.ts.
+export type DocumentType = 'DNI' | 'CPF' | 'CC' | 'CI' | 'CURP';
 
 // Las columnas con default (id, created_at, ...) son opcionales al insertar;
 // `Req` lista las que si son obligatorias.
@@ -60,6 +63,8 @@ export type Campus = {
   public_request_token: string;
   default_currency: string;
   timezone: string | null;
+  /** Como se llama el documento de identidad aca. Se imprime en el acta. */
+  document_type: DocumentType;
   is_active: boolean;
   created_at: string;
   updated_at: string;

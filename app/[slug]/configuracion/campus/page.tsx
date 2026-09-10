@@ -2,6 +2,7 @@ import { requireAdminOrg } from '@/lib/auth';
 import { createCampus, toggleCampus, updateCampus } from '@/lib/actions/settings';
 import { createClient } from '@/lib/supabase/server';
 import { listCurrencies } from '@/lib/currencies';
+import { DOCUMENT_TYPES, documentLabel } from '@/lib/documents';
 import { TIMEZONES, timezoneLabel } from '@/lib/timezones';
 import { ActionForm, SubmitButton } from '@/components/form';
 import { ModalButton } from '@/components/modal';
@@ -42,6 +43,14 @@ export default async function CampusSettingsPage(
                 <CurrencyOptions currencies={currencies} long />
               </Select>
             </Field>
+            <Field
+              label="Documento"
+              hint="El acta de conteo deja el renglón al lado de cada firma para anotarlo a mano."
+            >
+              <Select name="document_type" defaultValue="DNI">
+                <DocumentOptions />
+              </Select>
+            </Field>
             <Field label="Zona horaria" hint="Dejala vacía para usar la de la organización.">
               <Select name="timezone" defaultValue="">
                 <option value="">Igual que la organización</option>
@@ -79,6 +88,15 @@ export default async function CampusSettingsPage(
                   <CurrencyOptions currencies={currencies} />
                 </Select>
               </Field>
+              <Field label="Documento">
+                <Select
+                  name="document_type"
+                  defaultValue={campus.document_type}
+                  className="w-32"
+                >
+                  <DocumentOptions />
+                </Select>
+              </Field>
             </ActionForm>
 
             <div className="flex items-center gap-3">
@@ -97,4 +115,16 @@ export default async function CampusSettingsPage(
       </Card>
     </div>
   );
+}
+
+/**
+ * Como se llama el documento de identidad en el pais del campus. Es la
+ * etiqueta que se imprime en el acta, no un dato que la app valide.
+ */
+function DocumentOptions() {
+  return DOCUMENT_TYPES.map((code) => (
+    <option key={code} value={code}>
+      {documentLabel(code)}
+    </option>
+  ));
 }

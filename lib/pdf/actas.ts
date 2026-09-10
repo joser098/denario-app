@@ -2,6 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
 import { formatLong, formatTime } from '@/lib/dates';
+import { DEFAULT_DOCUMENT_TYPE } from '@/lib/documents';
 import { formatMoney, formatTotals, sumByCurrency } from '@/lib/money';
 import { isEmpty, methodLabel, methodsOf, summarize, type Breakdown } from '@/lib/sundays';
 import { Sheet } from '@/lib/pdf/sheet';
@@ -11,6 +12,19 @@ type Client = SupabaseClient<Database>;
 export type Acta = { path: string; bytes: Uint8Array };
 
 const GENERATED_BY = 'Documento generado por Denario.';
+
+/**
+ * Declaracion jurada del acta de conteo.
+ *
+ * Va solo en esta acta y no en el cierre del domingo ni en la caja de
+ * ventas: habla del conteo y de los fondos contabilizados, y la firman las
+ * tres personas que estuvieron contando.
+ */
+const DECLARACION = [
+  'Los firmantes declaran participar del presente conteo de manera libre y voluntaria y manifiestan que, conforme a lo observado, los fondos contabilizados provienen de aportes realizados voluntariamente.',
+  'Asimismo, declaran bajo juramento que los importes y datos consignados en la presente acta son ciertos y reflejan fielmente el conteo realizado, comprometiéndose a actuar con integridad, transparencia y buena fe, y a informar cualquier diferencia o irregularidad detectada.',
+  'La firma del acta implica conformidad con lo aquí consignado, sin perjuicio de las responsabilidades legales que pudieran corresponder.',
+];
 
 function stamp(iso: string | null): string {
   if (!iso) return '';
@@ -102,7 +116,7 @@ export async function buildCountActa(supabase: Client, countId: string): Promise
 
   const [{ data: org }, { data: campus }, { data: lines }] = await Promise.all([
     supabase.from('organizations').select('name, logo_path').eq('id', sunday.organization_id).maybeSingle(),
-    supabase.from('campuses').select('name').eq('id', sunday.campus_id).maybeSingle(),
+    supabase.from('campuses').select('name, document_type').eq('id', sunday.campus_id).maybeSingle(),
     supabase.from('offering_count_lines').select('*').eq('offering_count_id', countId),
   ]);
 
@@ -170,11 +184,24 @@ export async function buildCountActa(supabase: Client, countId: string): Promise
     sheet.text(count.notes, { size: 10 });
   }
 
-  sheet.signatures([
-    { role: 'Contó', name: count.volunteer_name ?? '' },
-    { role: 'Testigo 1', name: count.witness_1_name ?? '' },
-    { role: 'Testigo 2', name: count.witness_2_name ?? '' },
-  ]);
+  // El bloque reservado es el titulo y el primer parrafo: si no entran, la
+  // declaracion entera arranca en la hoja siguiente en vez de partirse justo
+  // despues del titulo.
+  sheet.gap(10);
+  sheet.reserve(72);
+  sheet.text('Declaración jurada', { size: 9, bold: true, muted: true });
+  for (const paragraph of DECLARACION) sheet.text(paragraph, { size: 9 });
+
+  // El documento no se carga en la app: el renglon va en blanco y cada quien
+  // lo completa a mano al firmar.
+  sheet.signatures(
+    [
+      { role: 'Contó', name: count.volunteer_name ?? '' },
+      { role: 'Testigo 1', name: count.witness_1_name ?? '' },
+      { role: 'Testigo 2', name: count.witness_2_name ?? '' },
+    ],
+    { document: campus?.document_type ?? DEFAULT_DOCUMENT_TYPE },
+  );
 
   sheet.footer([
     `Acta ${count.public_id} · firmada el ${stamp(count.finalized_at)}`,

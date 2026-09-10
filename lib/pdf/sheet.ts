@@ -215,11 +215,20 @@ export class Sheet {
     this.y -= size + 8;
   }
 
-  /** Linea de firma con el nombre debajo. */
-  signatures(entries: Array<{ role: string; name: string }>) {
+  /**
+   * Linea de firma con el nombre debajo.
+   *
+   * `document` agrega un segundo renglon en blanco para que quien firma
+   * anote ahi su documento a mano. La etiqueta la pone el campus ("DNI",
+   * "CPF", ...) porque el documento no se llama igual en todos los paises.
+   */
+  signatures(
+    entries: Array<{ role: string; name: string }>,
+    { document }: { document?: string } = {},
+  ) {
     if (entries.length === 0) return;
     this.gap(28);
-    this.ensure(48);
+    this.ensure(document ? 64 : 48);
 
     const slot = this.width / entries.length;
     entries.forEach((entry, index) => {
@@ -246,9 +255,30 @@ export class Sheet {
         font: this.regular,
         color: MUTED,
       });
+
+      if (document) {
+        const label = safeText(document);
+        const labelWidth = this.regular.widthOfTextAtSize(label, 8);
+
+        this.page.drawText(label, {
+          x,
+          y: this.y - 44,
+          size: 8,
+          font: this.regular,
+          color: MUTED,
+        });
+        // El renglon arranca despues de la etiqueta y termina donde termina
+        // la linea de firma: los dos huecos quedan alineados.
+        this.page.drawLine({
+          start: { x: x + labelWidth + 4, y: this.y - 46 },
+          end: { x: x + lineWidth, y: this.y - 46 },
+          thickness: 0.5,
+          color: RULE,
+        });
+      }
     });
 
-    this.y -= 40;
+    this.y -= document ? 56 : 40;
   }
 
   footer(lines: string[]) {

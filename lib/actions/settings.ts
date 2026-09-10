@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { canAdmin, canWrite, requireOrg } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { toDocumentType } from '@/lib/documents';
 import type { FormState } from '@/lib/forms';
 import { LOGO_BUCKET } from '@/lib/logo';
 import { parseAmount } from '@/lib/money';
@@ -179,6 +180,7 @@ export async function createCampus(_prev: FormState, formData: FormData): Promis
     name,
     slug: slugify(name),
     default_currency: String(formData.get('default_currency') || ctx.organization.default_currency),
+    document_type: toDocumentType(formData.get('document_type')),
     timezone: (formData.get('timezone') as string) || null,
   });
 
@@ -198,7 +200,11 @@ export async function updateCampus(_prev: FormState, formData: FormData): Promis
   const supabase = await createClient();
   const { error } = await supabase
     .from('campuses')
-    .update({ name, default_currency: String(formData.get('default_currency') || 'ARS') })
+    .update({
+      name,
+      default_currency: String(formData.get('default_currency') || 'ARS'),
+      document_type: toDocumentType(formData.get('document_type')),
+    })
     .eq('id', String(formData.get('id')))
     .eq('organization_id', ctx.organization.id);
 
