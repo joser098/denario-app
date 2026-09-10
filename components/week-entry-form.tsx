@@ -14,7 +14,7 @@ export type ConceptOption = {
 };
 
 /**
- * Alta de un movimiento de la semana. Los campos dependen del concepto
+ * Alta de un movimiento del periodo. Los campos dependen del concepto
  * elegido: cada uno habilita sus monedas y solo algunos piden ademas cuantos
  * movimientos componen el monto (USD 100 puede ser 4 transacciones de 25).
  */
@@ -109,7 +109,7 @@ export function WeekEntryForm({
           </Field>
         ) : null}
 
-        <Field label="Fecha" hint="Opcional, dentro de la semana.">
+        <Field label="Fecha" hint="Opcional, dentro del período.">
           <Input
             name="entry_date"
             type="date"

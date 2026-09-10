@@ -17,6 +17,10 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
   const { organization, campuses, campusId, role } = await requireOrg(slug);
   const writes = canWrite(role);
 
+  // Sugerencia para el formulario, no una regla: la semana martes a lunes
+  // que corre hoy. Las dos fechas se editan.
+  const suggested = weekOf(todayIn(organization.timezone));
+
   const supabase = await createClient();
   // Quien esta acotado a un campus ve solo las semanas de ese campus. RLS ya
   // lo recorta; el filtro esta para que la consulta diga lo mismo que la
@@ -48,23 +52,37 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Semanal"
-        subtitle="Libro general de martes a lunes. Se carga aparte de Domingos."
+        subtitle="Libro general por período. Se carga aparte de Domingos."
       />
 
       {writes ? (
         <Card className="p-5">
-          <h2 className="mb-4 text-sm font-medium text-zinc-900">Abrir una semana</h2>
+          <h2 className="mb-4 text-sm font-medium text-zinc-900">Abrir un período</h2>
           <ActionForm
             action={openWeek}
-            submitLabel="Abrir semana"
+            submitLabel="Abrir período"
             fieldsClassName="flex flex-wrap items-end gap-3"
           >
             <input type="hidden" name="slug" value={slug} />
-            <Field label="Fecha" hint="Cualquier día: se toma la semana martes a lunes que lo contiene.">
+            {/*
+              Viene precargada la semana martes a lunes en curso porque es lo
+              que se venía usando, pero son dos fechas sueltas: el período es
+              el que elijas — una quincena, un mes, lo que sea.
+            */}
+            <Field label="Desde">
               <Input
-                name="any_date"
+                name="start_date"
                 type="date"
-                defaultValue={todayIn(organization.timezone)}
+                defaultValue={suggested.start}
+                className="w-44"
+                required
+              />
+            </Field>
+            <Field label="Hasta" hint="El período que quieras. No puede pisarse con otro del campus.">
+              <Input
+                name="end_date"
+                type="date"
+                defaultValue={suggested.end}
                 className="w-44"
                 required
               />
@@ -89,8 +107,8 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
 
       {(weeks ?? []).length === 0 ? (
         <EmptyState
-          title="Todavía no abriste ninguna semana."
-          description="La semana del reporte va de martes a lunes."
+          title="Todavía no abriste ningún período."
+          description="Elegí desde y hasta arriba. Un gasto solo entra al libro si su fecha cae adentro de un período abierto."
         />
       ) : (
         <Card className="divide-y divide-zinc-100">
@@ -127,7 +145,7 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
                     <span className="text-sm text-zinc-500">Sin movimientos</span>
                   )}
                   <Badge tone={week.status === 'closed' ? 'green' : 'amber'}>
-                    {week.status === 'closed' ? 'Cerrada' : 'Abierta'}
+                    {week.status === 'closed' ? 'Cerrado' : 'Abierto'}
                   </Badge>
                 </div>
               </Link>
@@ -137,7 +155,8 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
       )}
 
       <p className="text-xs text-zinc-500">
-        La semana en curso es {formatRange(weekOf(todayIn(organization.timezone)))}.
+        Los períodos no se abren solos. Un pago o una compra cuya fecha no caiga en ninguno no se
+        registra hasta que lo abras.
       </p>
     </div>
   );

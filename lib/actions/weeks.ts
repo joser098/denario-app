@@ -4,7 +4,6 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { canAdmin, canWrite, inCampus, requireOrg, type OrgContext } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { weekOf } from '@/lib/dates';
 import { parseAmount } from '@/lib/money';
 import type { FormState } from '@/lib/forms';
 
@@ -18,11 +17,15 @@ async function writeContext(formData: FormData) {
 
 const DENIED: FormState = { error: 'No tenés permiso para cargar movimientos.' };
 
-/** Una semana de otro campus no existe para quien esta acotado al suyo. */
-const NOT_MINE: FormState = { error: 'Esa semana no existe.' };
+/** Un periodo de otro campus no existe para quien esta acotado al suyo. */
+const NOT_MINE: FormState = { error: 'Ese período no existe.' };
 
 function fail(error: { message: string; code?: string }): FormState {
-  if (error.code === '23505') return { error: 'Esa semana ya está abierta.' };
+  if (error.code === '23505') return { error: 'Ese período ya está abierto.' };
+  // 23P01: la exclusion constraint. Dos períodos del mismo campus no se pisan.
+  if (error.code === '23P01') {
+    return { error: 'Ese período se pisa con otro que ya está abierto.' };
+  }
   return { error: error.message };
 }
 
@@ -31,8 +34,8 @@ function weekPath(ctx: OrgContext, weekId: string) {
 }
 
 /**
- * La semana tiene que existir, ser de esta organizacion y del campus del
- * miembro, y estar abierta.
+ * El periodo tiene que existir, ser de esta organizacion y del campus del
+ * miembro, y estar abierto.
  */
 async function ownWeek(supabase: Supabase, ctx: OrgContext, weekId: string) {
   const { data } = await supabase
@@ -51,26 +54,30 @@ async function openWeekRow(supabase: Supabase, ctx: OrgContext, weekId: string) 
 
   if (!week) return { error: NOT_MINE.error } as const;
   if (week.status === 'closed') {
-    return { error: 'La semana está cerrada. Reabrila para poder cargar.' } as const;
+    return { error: 'El período está cerrado. Reabrilo para poder cargar.' } as const;
   }
   return { week } as const;
 }
 
 // ============================================================
-// La semana
+// El periodo
 // ============================================================
 
 export async function openWeek(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await writeContext(formData);
   if (!ctx) return DENIED;
 
-  const date = String(formData.get('any_date') ?? '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: 'Elegí una fecha de la semana.' };
+  // El periodo es el que elija quien lo abre: una semana, una quincena, un
+  // mes. Lo unico que la base exige es que no se pise con otro del campus.
+  const start = String(formData.get('start_date') ?? '');
+  const end = String(formData.get('end_date') ?? '');
+  const isDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
-  // La semana del reporte va de martes a lunes: la fecha elegida se corre al
-  // martes de esa semana, sea cual sea el dia que hayan puesto.
-  const range = weekOf(date);
-  // Toda semana es de un campus: no existe mas el libro de toda la
+  if (!isDate(start) || !isDate(end)) return { error: 'Elegí desde qué día hasta qué día va.' };
+  // Fechas ISO: comparar los strings alcanza y evita construir dos Date.
+  if (end < start) return { error: 'El "hasta" no puede ser anterior al "desde".' };
+
+  // Todo periodo es de un campus: no existe mas el libro de toda la
   // organizacion, porque cada campus puede llevar su propia moneda.
   const campusId = String(formData.get('campus_id') ?? '');
   if (!campusId) return { error: 'Elegí el campus.' };
@@ -82,14 +89,14 @@ export async function openWeek(_prev: FormState, formData: FormData): Promise<Fo
     .insert({
       organization_id: ctx.organization.id,
       campus_id: campusId,
-      start_date: range.start,
-      end_date: range.end,
+      start_date: start,
+      end_date: end,
     })
     .select('id')
     .single();
 
   if (error) return fail(error);
-  if (!week) return { error: 'No se pudo abrir la semana.' };
+  if (!week) return { error: 'No se pudo abrir el período.' };
 
   revalidatePath(`/${ctx.organization.slug}/semanal`);
   redirect(weekPath(ctx, week.id));
@@ -136,7 +143,7 @@ export async function closeWeek(_prev: FormState, formData: FormData): Promise<F
   if (error) return fail(error);
 
   revalidatePath(`/${ctx.organization.slug}/semanal`, 'layout');
-  return { message: 'Semana cerrada.' };
+  return { message: 'Período cerrado.' };
 }
 
 export async function reopenWeek(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -144,7 +151,7 @@ export async function reopenWeek(_prev: FormState, formData: FormData): Promise<
   if (!ctx) return DENIED;
   // Reabrir deshace un cierre: queda para administradores.
   if (!canAdmin(ctx.role)) {
-    return { error: 'Solo un administrador puede reabrir una semana cerrada.' };
+    return { error: 'Solo un administrador puede reabrir un período cerrado.' };
   }
 
   const weekId = String(formData.get('week_id'));
@@ -160,11 +167,11 @@ export async function reopenWeek(_prev: FormState, formData: FormData): Promise<
   if (error) return fail(error);
 
   revalidatePath(`/${ctx.organization.slug}/semanal`, 'layout');
-  return { message: 'Semana reabierta.' };
+  return { message: 'Período reabierto.' };
 }
 
 // ============================================================
-// Movimientos de la semana
+// Movimientos del periodo
 // ============================================================
 
 export async function addWeekEntry(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -194,7 +201,7 @@ export async function addWeekEntry(_prev: FormState, formData: FormData): Promis
     return { error: 'La cantidad de movimientos tiene que ser un número.' };
   }
 
-  // La moneda habilitada y la fecha dentro de la semana las valida un trigger:
+  // La moneda habilitada y la fecha dentro del periodo las valida un trigger:
   // aca solo traducimos su mensaje si salta.
   const { error } = await supabase.from('week_entries').insert({
     week_id: weekId,

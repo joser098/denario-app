@@ -50,7 +50,11 @@ export function onOrBefore(date: string, weekday: number): string {
   return addDays(date, -diff);
 }
 
-// ---------- Semana del reporte: martes a lunes ----------
+// ---------- Semana martes a lunes ----------
+//
+// Ya no es "el periodo del libro": desde que el Semanal abre por rango
+// libre, esto es solo la sugerencia que viene precargada en el formulario y
+// la base para comparar semanas en el dashboard.
 
 /** La semana (martes-lunes) que contiene `date`. */
 export function weekOf(date: string): DateRange {

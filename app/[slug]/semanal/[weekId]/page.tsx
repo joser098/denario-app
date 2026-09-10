@@ -16,7 +16,7 @@ import { ActionForm, SubmitButton } from '@/components/form';
 import { WeekEntryForm } from '@/components/week-entry-form';
 import { Alert, Badge, Card, EmptyState, Field, PageHeader, Textarea } from '@/components/ui';
 
-export const metadata = { title: 'Semana' };
+export const metadata = { title: 'Período' };
 
 export default async function WeekPage(props: PageProps<'/[slug]/semanal/[weekId]'>) {
   const { slug, weekId } = await props.params;
@@ -88,20 +88,20 @@ export default async function WeekPage(props: PageProps<'/[slug]/semanal/[weekId
           title={formatRange(range)}
           subtitle={`${scope} · ${formatShort(week.start_date)} al ${formatShort(week.end_date)}`}
           actions={
-            <Badge tone={closed ? 'green' : 'amber'}>{closed ? 'Cerrada' : 'Abierta'}</Badge>
+            <Badge tone={closed ? 'green' : 'amber'}>{closed ? 'Cerrado' : 'Abierto'}</Badge>
           }
         />
       </div>
 
       {closed ? (
         <Alert tone="info">
-          La semana está cerrada: quedó en solo lectura. Un administrador puede reabrirla.
+          El período está cerrado: quedó en solo lectura. Un administrador puede reabrirlo.
         </Alert>
       ) : null}
 
       {/* ---------- El libro ---------- */}
       {!hasAny ? (
-        <EmptyState title="Todavía no cargaste movimientos en esta semana." />
+        <EmptyState title="Todavía no cargaste movimientos en este período." />
       ) : (
         <Card className="overflow-x-auto">
           <table className="w-full min-w-lg text-sm">
@@ -281,7 +281,7 @@ export default async function WeekPage(props: PageProps<'/[slug]/semanal/[weekId
         <div className="grid gap-4 sm:grid-cols-2">
           {writes ? (
             <Card className="p-5">
-              <h2 className="mb-4 text-sm font-medium text-zinc-900">Notas de la semana</h2>
+              <h2 className="mb-4 text-sm font-medium text-zinc-900">Notas del período</h2>
               <ActionForm action={updateWeekNotes} submitLabel="Guardar notas">
                 <input type="hidden" name="slug" value={slug} />
                 <input type="hidden" name="week_id" value={weekId} />
@@ -289,7 +289,7 @@ export default async function WeekPage(props: PageProps<'/[slug]/semanal/[weekId
                   <Textarea
                     name="notes"
                     defaultValue={week.notes ?? ''}
-                    placeholder="Algo para dejar asentado de esta semana."
+                    placeholder="Algo para dejar asentado de este período."
                   />
                 </Field>
               </ActionForm>
@@ -298,7 +298,7 @@ export default async function WeekPage(props: PageProps<'/[slug]/semanal/[weekId
 
           <Card className="flex flex-col gap-3 p-5">
             <h2 className="text-sm font-medium text-zinc-900">
-              {closed ? 'Reabrir la semana' : 'Cerrar la semana'}
+              {closed ? 'Reabrir el período' : 'Cerrar el período'}
             </h2>
             <p className="text-xs text-zinc-500">
               {closed
@@ -307,7 +307,7 @@ export default async function WeekPage(props: PageProps<'/[slug]/semanal/[weekId
             </p>
             <ActionForm
               action={closed ? reopenWeek : closeWeek}
-              submitLabel={closed ? 'Reabrir semana' : 'Cerrar semana'}
+              submitLabel={closed ? 'Reabrir período' : 'Cerrar período'}
               submitVariant={closed ? 'secondary' : 'primary'}
             >
               <input type="hidden" name="slug" value={slug} />

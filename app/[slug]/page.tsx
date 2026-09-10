@@ -8,7 +8,6 @@ import {
   formatRange,
   sameMonth,
   todayIn,
-  weekOf,
 } from '@/lib/dates';
 import { formatAmount, formatMoney, formatTotals } from '@/lib/money';
 import { isEmpty, summarize, type Totals } from '@/lib/sundays';
@@ -23,7 +22,6 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
   const { organization, campuses, campusId, role } = await requireOrg(slug);
 
   const today = todayIn(organization.timezone);
-  const week = weekOf(today);
 
   const supabase = await createClient();
   const [{ data: recentSundays }, { data: currentWeeks }, { count: members }] = await Promise.all([
@@ -35,13 +33,16 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
       .eq('organization_id', organization.id)
       .order('service_date', { ascending: false })
       .limit(60),
-    // Una semana por campus. Cual se muestra depende del campus elegido mas
-    // abajo, asi que se traen todas las de la fecha y se filtra despues.
+    // El periodo que contiene hoy, que ya no es una semana fija: lo abrio
+    // alguien eligiendo desde y hasta. Uno por campus como mucho — la base no
+    // deja que dos se pisen. Cual se muestra depende del campus elegido mas
+    // abajo, asi que se traen todos y se filtra despues.
     supabase
       .from('weeks')
-      .select('id, status, campus_id')
+      .select('id, status, campus_id, start_date, end_date')
       .eq('organization_id', organization.id)
-      .eq('start_date', week.start),
+      .lte('start_date', today)
+      .gte('end_date', today),
     supabase
       .from('organization_members')
       .select('id', { count: 'exact', head: true })
@@ -104,6 +105,12 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
   });
   const weekBalance = weekTotals(weekRows);
   const openWeek = campusWeeks.some((w) => w.status === 'open');
+  // Si no hay periodo abierto para hoy no hay rango que mostrar: antes se
+  // pintaba igual el martes-lunes calculado, que no correspondia a nada.
+  const currentWeek = campusWeeks[0];
+  const weekRange = currentWeek
+    ? formatRange({ start: currentWeek.start_date, end: currentWeek.end_date })
+    : 'Sin período abierto';
 
   return (
     <div className="flex flex-col gap-6">
@@ -160,9 +167,9 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
 
         <Card className="flex flex-col gap-3 p-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-medium text-zinc-500">Semana en curso</h2>
+            <h2 className="text-sm font-medium text-zinc-500">Período en curso</h2>
             {weekIds.length === 0 ? null : (
-              <Badge tone={openWeek ? 'amber' : 'green'}>{openWeek ? 'Abierta' : 'Cerrada'}</Badge>
+              <Badge tone={openWeek ? 'amber' : 'green'}>{openWeek ? 'Abierto' : 'Cerrado'}</Badge>
             )}
           </div>
 
@@ -172,7 +179,7 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
                 {formatTotals(weekBalance.balance)}
               </p>
               <p className="text-xs text-zinc-500">
-                {formatRange(week)}
+                {weekRange}
                 {isEmpty(weekBalance.expense)
                   ? null
                   : ` · ingresos ${formatTotals(weekBalance.income)} · egresos ${formatTotals(weekBalance.expense)}`}
@@ -180,8 +187,10 @@ export default async function OrgHomePage(props: PageProps<'/[slug]'>) {
             </div>
           ) : (
             <div>
-              <p className="text-2xl font-semibold text-zinc-500">Sin movimientos</p>
-              <p className="text-xs text-zinc-500">{formatRange(week)}</p>
+              <p className="text-2xl font-semibold text-zinc-500">
+                {currentWeek ? 'Sin movimientos' : 'Sin período'}
+              </p>
+              <p className="text-xs text-zinc-500">{weekRange}</p>
             </div>
           )}
 

@@ -1,7 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
-import { formatRange, weekOf } from '@/lib/dates';
+import { formatRange, formatShort } from '@/lib/dates';
 
 type Client = SupabaseClient<Database>;
 
@@ -27,12 +27,18 @@ export const PAYMENT_STATUS_LABELS = {
 } as const;
 
 /**
- * Deja el gasto en el libro semanal, en la semana que contiene la fecha.
+ * Deja el gasto en el libro semanal, en el período que contiene la fecha.
  *
- * Si esa semana todavía no existe se abre sola — obligar a abrirla a mano
- * antes de poder entregar una compra sería una traba sin sentido. Si existe
- * pero está cerrada, la operación se corta: meter el gasto en otra semana
- * para no molestar sería mentir sobre cuándo pasó.
+ * El período no se abre solo: lo abre una persona, eligiendo desde y hasta.
+ * Si la fecha del gasto no cae en ninguno, la operación se corta y avisa —
+ * antes se abría una semana martes a lunes al vuelo, y eso terminaba
+ * creando períodos que nadie había decidido abrir.
+ *
+ * Si existe pero está cerrado, también se corta: meter el gasto en otro
+ * período para no molestar sería mentir sobre cuándo pasó.
+ *
+ * `maybeSingle` alcanza porque la base no deja que dos períodos del mismo
+ * campus se pisen (`weeks_no_overlap`): a lo sumo hay uno que lo contenga.
  *
  * El movimiento queda marcado con su origen, así que en el Semanal se ve
  * como automático y no se puede borrar suelto.
@@ -51,43 +57,31 @@ export async function recordWeeklyExpense(
     description: string;
   },
 ): Promise<{ error?: string }> {
-  const range = weekOf(input.date);
-
-  // El gasto es del campus que lo pidió, así que cae en la semana de ese
-  // campus — no en la de toda la organización.
-  const { data: existing } = await supabase
+  // El gasto es del campus que lo pidió, así que cae en el período de ese
+  // campus — no en el de toda la organización.
+  const { data: week } = await supabase
     .from('weeks')
-    .select('id, status')
+    .select('id, status, start_date, end_date')
     .eq('organization_id', input.organizationId)
     .eq('campus_id', input.campusId)
-    .eq('start_date', range.start)
+    .lte('start_date', input.date)
+    .gte('end_date', input.date)
     .maybeSingle();
 
-  if (existing?.status === 'closed') {
+  if (!week) {
     return {
-      error: `La semana ${formatRange(range)} está cerrada. Reabrila para poder registrar el gasto.`,
+      error: `No hay ningún período del Semanal que contenga el ${formatShort(input.date)}. Abrilo en Semanal y volvé a intentar.`,
     };
   }
 
-  let weekId = existing?.id;
-
-  if (!weekId) {
-    const { data: created, error } = await supabase
-      .from('weeks')
-      .insert({
-        organization_id: input.organizationId,
-        campus_id: input.campusId,
-        start_date: range.start,
-        end_date: range.end,
-      })
-      .select('id')
-      .single();
-
-    if (error || !created) {
-      return { error: 'No se pudo abrir la semana para registrar el gasto.' };
-    }
-    weekId = created.id;
+  if (week.status === 'closed') {
+    const range = { start: week.start_date, end: week.end_date };
+    return {
+      error: `El período ${formatRange(range)} está cerrado. Reabrilo para poder registrar el gasto.`,
+    };
   }
+
+  const weekId = week.id;
 
   const { data: concept } = await supabase
     .from('week_concepts')
