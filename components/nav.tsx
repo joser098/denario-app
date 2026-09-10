@@ -86,6 +86,7 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
 export type IconName =
   | 'resumen'
   | 'domingos'
+  | 'actas'
   | 'semanal'
   | 'gastos'
   | 'reportes'
@@ -106,6 +107,12 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <rect x="3" y="5" width="18" height="16" rx="2" />
       <path d="M8 3v4M16 3v4M3 11h18" />
+    </>
+  ),
+  actas: (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 8h8M8 12h8M8 16h5" />
     </>
   ),
   semanal: (

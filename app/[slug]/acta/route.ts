@@ -4,12 +4,17 @@ import { createClient } from '@/lib/supabase/server';
 import { pdfName, type PdfKind } from '@/lib/pdf/names';
 
 /**
- * Descarga de un acta guardada en el bucket privado.
+ * Un acta guardada en el bucket privado.
  *
  * No sirve el archivo: pide una URL firmada de corta vida y redirige. La
  * autorizacion la da RLS sobre storage.objects — que mira la organizacion y
  * el campus del domingo que nombra el path — y el chequeo del prefijo evita
  * ademas que alguien pruebe paths de otra organizacion desde esta ruta.
+ *
+ * Con `?ver=1` la URL firmada sale sin `download`, asi que Storage la manda
+ * con `Content-Disposition: inline` y el navegador la abre en su visor en vez
+ * de bajarla. Es la misma URL y la misma autorizacion: lo unico que cambia es
+ * como la presenta el navegador.
  */
 export async function GET(request: NextRequest, ctx: RouteContext<'/[slug]/acta'>) {
   const { slug } = await ctx.params;
@@ -20,10 +25,14 @@ export async function GET(request: NextRequest, ctx: RouteContext<'/[slug]/acta'
     return new NextResponse('No encontrado', { status: 404 });
   }
 
+  // Mirar no es bajar: sin `download` no hace falta resolver el nombre
+  // lindo, que son dos consultas mas.
+  const view = request.nextUrl.searchParams.get('ver') === '1';
+
   const supabase = await createClient();
   const { data, error } = await supabase.storage
     .from('actas')
-    .createSignedUrl(path, 60, { download: await downloadName(supabase, path) });
+    .createSignedUrl(path, 60, view ? {} : { download: await downloadName(supabase, path) });
 
   if (error || !data) {
     return new NextResponse('No encontrado', { status: 404 });

@@ -43,6 +43,7 @@ export default async function OrgLayout(props: LayoutProps<'/[slug]'>) {
   ];
   if (canAdmin(role)) {
     items.push(
+      { href: `/${slug}/actas`, label: 'Actas', icon: 'actas' },
       { href: `/${slug}/usuarios`, label: 'Usuarios', icon: 'usuarios' },
       { href: `/${slug}/configuracion`, label: 'Configuración', icon: 'configuracion' },
     );
