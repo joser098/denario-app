@@ -124,6 +124,28 @@ export function fieldLabel(field: ReportField): string {
   return `${field.es} (${field.en})`;
 }
 
+/**
+ * Un reporte en el que nadie escribio todavia.
+ *
+ * Nace asi junto con el periodo, y mientras siga asi borrarlo no pierde
+ * nada. Alcanza con que un solo renglon tenga algo —un monto, una asistencia,
+ * una nota— para que deje de estarlo: eso ya es trabajo de alguien.
+ */
+export function isBlankReport(report: PlReport): boolean {
+  const amounts = [...REVENUE_FIELDS, ...EXPENSE_FIELDS, ...FOUNDATION_FIELDS].every(
+    (field) => Number(report[field.key] ?? 0) === 0,
+  );
+
+  return (
+    amounts &&
+    report.attendance === 0 &&
+    report.participants === 0 &&
+    report.salvations === 0 &&
+    !report.notes &&
+    !report.pdf_path
+  );
+}
+
 export const REPORT_STATUS_LABELS = {
   draft: 'Borrador',
   closed: 'Cerrado',

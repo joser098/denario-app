@@ -27,7 +27,9 @@ export function ActionForm({
 }: {
   action: (prev: FormState, data: FormData) => Promise<FormState>;
   submitLabel: string;
-  submitVariant?: 'primary' | 'secondary' | 'danger';
+  // `ghost` para lo destructivo que vive dentro de una lista: el boton no
+  // tiene que pelearle la atencion a las filas que esta al lado.
+  submitVariant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   children: ReactNode;
   footer?: ReactNode;
   replaceOnSuccess?: boolean;

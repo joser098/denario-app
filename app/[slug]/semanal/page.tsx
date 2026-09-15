@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { canAdmin, requireOrg } from '@/lib/auth';
-import { openPeriod } from '@/lib/actions/weeks';
+import { deletePeriod, openPeriod } from '@/lib/actions/weeks';
 import { createClient } from '@/lib/supabase/server';
 import { formatRange, todayIn, weekOf } from '@/lib/dates';
 import { formatTotals } from '@/lib/money';
 import { isEmpty } from '@/lib/sundays';
-import type { WeekAmount } from '@/lib/database.types';
+import type { WeekAmount, WeekCount } from '@/lib/database.types';
 import { hasMovements, weekTotals } from '@/lib/weeks';
 import { ActionForm } from '@/components/form';
 import { Badge, Card, EmptyState, Field, Input, PageHeader } from '@/components/ui';
@@ -39,14 +39,24 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
     .limit(60);
 
   const ids = (weeks ?? []).map((w) => w.id);
-  const { data: amounts } = ids.length
-    ? await supabase.from('week_amounts').select('*').in('week_id', ids)
-    : { data: [] as WeekAmount[] };
+  // Los conteos van aparte de los montos: transacciones y sobres no son
+  // plata, pero son algo cargado — un período que los tiene no está vacío.
+  const [{ data: amounts }, { data: counted }] = ids.length
+    ? await Promise.all([
+        supabase.from('week_amounts').select('*').in('week_id', ids),
+        supabase.from('week_counts').select('*').in('week_id', ids),
+      ])
+    : [{ data: [] as WeekAmount[] }, { data: [] as WeekCount[] }];
 
   const rowsByWeek = new Map<string, WeekAmount[]>();
   for (const row of amounts ?? []) {
     rowsByWeek.set(row.week_id, [...(rowsByWeek.get(row.week_id) ?? []), row]);
   }
+
+  const touched = new Set([
+    ...(amounts ?? []).map((row) => row.week_id),
+    ...(counted ?? []).filter((row) => row.movements > 0).map((row) => row.week_id),
+  ]);
 
   // Un período es el mismo tramo de calendario en todos los campus, así que
   // la lista lo muestra una sola vez con sus campus adentro. Cuatro filas
@@ -62,6 +72,17 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
     period.weeks!.push(week);
     periods.set(key, period);
   }
+
+  /**
+   * Un período que nadie tocó: ningún campus lo cerró y no tiene nada
+   * cargado. Recién ahí se ofrece borrarlo, igual que con un domingo — con
+   * un movimiento adentro ya es un libro y lo que se hace es corregirlo.
+   *
+   * El servidor vuelve a comprobarlo, y además mira los Profit & Loss: uno
+   * puede tener números tipeados a mano aunque el período esté vacío.
+   */
+  const untouched = (period: { weeks: typeof weeks }) =>
+    (period.weeks ?? []).every((week) => week.status === 'open' && !touched.has(week.id));
 
   const campusName = (id: string) => campuses.find((c) => c.id === id)?.name ?? 'Campus';
 
@@ -125,9 +146,27 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
         <div className="flex flex-col gap-5">
           {[...periods.values()].map((period) => (
             <section key={`${period.start}|${period.end}`} className="flex flex-col gap-2">
-              <h2 className="text-sm font-medium text-zinc-900">
-                {formatRange({ start: period.start, end: period.end })}
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-medium text-zinc-900">
+                  {formatRange({ start: period.start, end: period.end })}
+                </h2>
+
+                {admin && untouched(period) ? (
+                  <ActionForm
+                    action={deletePeriod}
+                    submitLabel="Borrar período"
+                    submitVariant="ghost"
+                    confirm={`Se borra el período ${formatRange({
+                      start: period.start,
+                      end: period.end,
+                    })} en todos los campus, con sus Profit & Loss. ¿Seguimos?`}
+                    className="items-end"
+                  >
+                    <input type="hidden" name="slug" value={slug} />
+                    <input type="hidden" name="start_date" value={period.start} />
+                  </ActionForm>
+                ) : null}
+              </div>
 
               <Card className="divide-y divide-zinc-100">
                 {(period.weeks ?? []).map((week) => {

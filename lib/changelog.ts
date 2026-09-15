@@ -83,6 +83,15 @@ export const CHANGELOG: Release[] = [
       },
       {
         kind: 'nuevo',
+        area: 'Semanal',
+        title: 'Un período abierto por error se puede borrar',
+        detail:
+          'Igual que con los domingos: si un administrador abrió un período con las fechas equivocadas, lo borra desde la lista de Semanal. Se borra en todos los campus a la vez, junto con los Profit & Loss que nacieron con él.',
+        action:
+          'Solo aparece mientras nadie lo tocó: sin movimientos, sin ningún campus cerrado y con los reportes todavía en blanco. Si un domingo ya bajó sus números, reabrilo para retirarlos y el período vuelve a quedar vacío.',
+      },
+      {
+        kind: 'nuevo',
         area: 'Actas',
         title: 'El cierre del período y el Profit & Loss quedan archivados',
         detail:

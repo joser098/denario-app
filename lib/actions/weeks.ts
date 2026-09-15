@@ -1,11 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { canAdmin, canWrite, inCampus, requireOrg, type OrgContext } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { parseAmount } from '@/lib/money';
 import { attachWeekPdf } from '@/lib/pdf/semanal';
-import { EXPENSE_BY_KEY } from '@/lib/reports';
+import { EXPENSE_BY_KEY, isBlankReport } from '@/lib/reports';
 import { loadWeek } from '@/lib/week-data';
 import type { WeekSummary } from '@/lib/weeks';
 import type { ExpenseKey } from '@/lib/database.types';
@@ -110,6 +111,84 @@ export async function openPeriod(_prev: FormState, formData: FormData): Promise<
   return {
     message: `Período abierto en ${opened} campus, con su Profit & Loss.`,
   };
+}
+
+/**
+ * Borra un periodo abierto por error, en toda la organizacion.
+ *
+ * Se abre en todos los campus de una vez, asi que se borra igual: un periodo
+ * que existe en tres campus y no en el cuarto es peor que ninguno — el que
+ * quedo afuera no tiene donde registrar un gasto y nadie se entera hasta que
+ * lo busca.
+ *
+ * Solo mientras no lo haya tocado nadie: sin movimientos, sin ningun campus
+ * cerrado y con los Profit & Loss todavia en blanco. En cuanto entra el
+ * primer numero deja de ser un error de tipeo y pasa a ser un libro.
+ */
+export async function deletePeriod(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireOrg(String(formData.get('slug') ?? ''));
+  if (!canAdmin(ctx.role)) return { error: 'Solo un administrador borra un período.' };
+
+  // Un administrador acotado a un campus solo alcanza las semanas de ese
+  // campus: borraria la suya y dejaria las otras. Mejor no empezar.
+  if (ctx.campusId) {
+    return {
+      error: 'El período es de toda la organización. Un administrador acotado a un campus no puede borrarlo.',
+    };
+  }
+
+  const start = String(formData.get('start_date') ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return { error: 'Falta el período.' };
+
+  const supabase = await createClient();
+  const { data: weeks } = await supabase
+    .from('weeks')
+    .select('id, status')
+    .eq('organization_id', ctx.organization.id)
+    .eq('start_date', start);
+
+  if (!weeks || weeks.length === 0) return { error: 'Ese período no existe.' };
+  if (weeks.some((week) => week.status === 'closed')) {
+    return { error: 'Ya hay campus con el período cerrado. Un cierre no se borra.' };
+  }
+
+  const ids = weeks.map((week) => week.id);
+
+  const { count } = await supabase
+    .from('week_entries')
+    .select('id', { count: 'exact', head: true })
+    .in('week_id', ids);
+
+  if (count) {
+    return {
+      error: `No se puede borrar: el período ya tiene ${count} movimiento(s) cargado(s). Si bajaron de un domingo, reabrilo para retirarlos.`,
+    };
+  }
+
+  const { data: reports } = await supabase.from('pl_reports').select('*').in('week_id', ids);
+  const written = (reports ?? []).filter(
+    (report) => report.status === 'closed' || !isBlankReport(report),
+  );
+
+  if (written.length > 0) {
+    return {
+      error: `No se puede borrar: ${written.length} Profit & Loss de este período ya tiene(n) números cargados.`,
+    };
+  }
+
+  // El reporte se borra a mano y no por cascada: la clave foránea lo deja
+  // huérfano en vez de arrastrarlo, a propósito, para que un reporte viejo
+  // sobreviva a cualquier limpieza de periodos. Acá sabemos que están en
+  // blanco, así que se van con su periodo.
+  const { error: reportError } = await supabase.from('pl_reports').delete().in('week_id', ids);
+  if (reportError) return fail(reportError);
+
+  const { error } = await supabase.from('weeks').delete().in('id', ids);
+  if (error) return fail(error);
+
+  revalidatePath(`/${ctx.organization.slug}/semanal`, 'layout');
+  revalidatePath(`/${ctx.organization.slug}/reportes`, 'layout');
+  redirect(`/${ctx.organization.slug}/semanal`);
 }
 
 export async function updateWeekNotes(
