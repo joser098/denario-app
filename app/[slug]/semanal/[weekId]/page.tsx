@@ -5,6 +5,7 @@ import {
   addWeekEntry,
   closeWeek,
   deleteWeekEntry,
+  importCashPayments,
   reopenWeek,
   setEntryCategory,
   updateWeekNotes,
@@ -13,6 +14,7 @@ import { openReport, saveExchangeRate } from '@/lib/actions/reports';
 import { createClient } from '@/lib/supabase/server';
 import { formatRange, formatShort } from '@/lib/dates';
 import { formatAmount, formatMoney, formatTotals } from '@/lib/money';
+import { pendingCashPayments } from '@/lib/expenses';
 import { EXPENSE_FIELDS, expenseLabel } from '@/lib/reports';
 import { loadWeek } from '@/lib/week-data';
 import { convert } from '@/lib/weeks';
@@ -51,6 +53,15 @@ export default async function WeekPage(props: PageProps<'/[slug]/semanal/[weekId
     .select('id, status')
     .eq('week_id', weekId)
     .maybeSingle();
+
+  // Los pagos en efectivo con fecha adentro del período que nunca llegaron
+  // al libro, porque cuando se emitió el recibo todavía no había período.
+  const pending = await pendingCashPayments(supabase, {
+    organizationId: organization.id,
+    campusId: loaded.week.campus_id,
+    from: loaded.week.start_date,
+    to: loaded.week.end_date,
+  });
 
   const closed = week.status === 'closed';
   const writes = canWrite(role) && !closed;
@@ -155,6 +166,44 @@ export default async function WeekPage(props: PageProps<'/[slug]/semanal/[weekId
           Hay {uncategorized.length} egreso(s) sin categoría. Elegiles una más abajo: es el
           renglón del Profit &amp; Loss donde va a caer cada uno.
         </Alert>
+      ) : null}
+
+      {/* ---------- Gastos que quedaron afuera ---------- */}
+      {writes && pending.length > 0 ? (
+        <Card className="flex flex-col gap-3 p-5">
+          <h2 className="text-sm font-medium text-zinc-900">
+            {pending.length} pago(s) en efectivo con fecha de este período no están en el libro
+          </h2>
+          <p className="text-xs text-zinc-500">
+            El recibo se emite aunque no haya período abierto —lleva número correlativo y ya está
+            entregado—, así que el asiento queda esperando. Traelos ahora y elegiles la categoría.
+          </p>
+
+          <ul className="flex flex-col gap-1 text-sm text-zinc-700">
+            {pending.map((payment) => (
+              <li key={payment.id} className="flex flex-wrap justify-between gap-x-4">
+                <span>
+                  <span className="text-zinc-500">N° {payment.receipt_number}</span>{' '}
+                  {payment.payee_name} · {payment.concept}
+                </span>
+                <span className="tabular-nums">
+                  {formatShort(payment.paid_on)} ·{' '}
+                  {formatMoney(Number(payment.amount), payment.currency_code)}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <ActionForm
+            action={importCashPayments}
+            submitLabel="Traer al libro"
+            submitVariant="secondary"
+            className="items-start"
+          >
+            <input type="hidden" name="slug" value={slug} />
+            <input type="hidden" name="week_id" value={weekId} />
+          </ActionForm>
+        </Card>
       ) : null}
 
       {/* ---------- El libro ---------- */}

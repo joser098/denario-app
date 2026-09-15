@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { canAdmin, canWrite, inCampus, requireOrg, type OrgContext } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { parseAmount } from '@/lib/money';
+import { EXPENSE_CONCEPTS, SOURCES, pendingCashPayments, recordWeeklyExpense } from '@/lib/expenses';
 import { attachWeekPdf } from '@/lib/pdf/semanal';
 import { EXPENSE_BY_KEY, isBlankReport } from '@/lib/reports';
 import { loadWeek } from '@/lib/week-data';
@@ -343,6 +344,80 @@ export async function reopenWeek(_prev: FormState, formData: FormData): Promise<
 
   revalidatePath(`/${ctx.organization.slug}/semanal`, 'layout');
   return { message: 'Período reabierto.' };
+}
+
+/**
+ * Trae al libro los pagos en efectivo que habian quedado afuera.
+ *
+ * Un pago en efectivo se registra aunque no haya periodo: el recibo lleva
+ * numero correlativo y ya se le entrego a alguien, asi que emitirlo no puede
+ * depender de que la tesoreria haya abierto la semana. Lo que queda
+ * pendiente es el asiento, y este es el boton que lo salda cuando el periodo
+ * por fin existe.
+ *
+ * Entran sin categoria, como cualquier gasto que baja de Gastos: se les
+ * elige una en la misma pantalla antes de cerrar.
+ */
+export async function importCashPayments(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const ctx = await writeContext(formData);
+  if (!ctx) return DENIED;
+
+  const weekId = String(formData.get('week_id'));
+  const supabase = await createClient();
+  const check = await openWeekRow(supabase, ctx, weekId);
+  if ('error' in check) return { error: check.error };
+
+  const { data: week } = await supabase
+    .from('weeks')
+    .select('campus_id, start_date, end_date')
+    .eq('id', weekId)
+    .maybeSingle();
+
+  if (!week) return NOT_MINE;
+
+  const pending = await pendingCashPayments(supabase, {
+    organizationId: ctx.organization.id,
+    campusId: week.campus_id,
+    from: week.start_date,
+    to: week.end_date,
+  });
+
+  if (pending.length === 0) return { message: 'No quedaba ningún pago afuera.' };
+
+  let entered = 0;
+  const failed: string[] = [];
+
+  for (const payment of pending) {
+    const recorded = await recordWeeklyExpense(supabase, {
+      organizationId: ctx.organization.id,
+      campusId: week.campus_id,
+      conceptCode: EXPENSE_CONCEPTS.cash,
+      amount: Number(payment.amount),
+      currency: payment.currency_code,
+      date: payment.paid_on,
+      sourceType: SOURCES.cash,
+      sourceId: payment.id,
+      description: `Pago en efectivo — ${payment.payee_name}`,
+    });
+
+    if (recorded.error) failed.push(`recibo N° ${payment.receipt_number}`);
+    else entered += 1;
+  }
+
+  revalidatePath(weekPath(ctx, weekId));
+
+  if (failed.length > 0) {
+    return {
+      error: `Entraron ${entered}, pero quedaron afuera ${failed.join(', ')}. Revisá que el concepto "Pagos en efectivo" admita esa moneda.`,
+    };
+  }
+
+  return {
+    message: `Entraron ${entered} pago(s) al libro. Elegiles la categoría antes de cerrar.`,
+  };
 }
 
 // ============================================================

@@ -5,7 +5,7 @@ import { canWrite, inCampus, requireOrg, type OrgContext } from '@/lib/auth';
 import { parseAmount } from '@/lib/money';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/dates';
-import { EXPENSE_CONCEPTS, recordWeeklyExpense } from '@/lib/expenses';
+import { EXPENSE_CONCEPTS, SOURCES, recordWeeklyExpense } from '@/lib/expenses';
 import type { FormState } from '@/lib/forms';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -155,7 +155,7 @@ export async function deliverPurchase(_prev: FormState, formData: FormData): Pro
     amount,
     currency,
     date: todayIn(ctx.organization.timezone),
-    sourceType: 'purchase_request',
+    sourceType: SOURCES.purchase,
     sourceId: id,
     description: `Compra — ${request.requester_name}`,
   });
@@ -283,7 +283,7 @@ export async function payPaymentRequest(
     amount,
     currency,
     date: todayIn(ctx.organization.timezone),
-    sourceType: 'payment_request',
+    sourceType: SOURCES.payment,
     sourceId: id,
     description: `Pago — ${request.description}`,
   });
@@ -453,7 +453,7 @@ export async function registerCashPayment(
     amount,
     currency,
     date: paidOn,
-    sourceType: 'cash_payment',
+    sourceType: SOURCES.cash,
     sourceId: created.id,
     description: `Pago en efectivo — ${payee}`,
   });

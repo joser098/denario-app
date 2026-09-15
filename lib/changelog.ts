@@ -83,6 +83,15 @@ export const CHANGELOG: Release[] = [
       },
       {
         kind: 'nuevo',
+        area: 'Semanal y Gastos',
+        title: 'Los pagos en efectivo que quedaron afuera se traen al libro',
+        detail:
+          'Un pago en efectivo se registra aunque no haya período abierto: el recibo lleva número correlativo y ya está entregado. Lo que quedaba pendiente era el asiento. Ahora el período avisa cuántos pagos con fecha adentro no están en el libro, los lista con su número de recibo y los trae con un botón.',
+        action:
+          'Entran sin categoría, como cualquier gasto que baja de Gastos: elegísela antes de cerrar el período.',
+      },
+      {
+        kind: 'nuevo',
         area: 'Semanal',
         title: 'Un período abierto por error se puede borrar',
         detail:

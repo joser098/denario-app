@@ -26,6 +26,54 @@ export const PAYMENT_STATUS_LABELS = {
   paid: 'Pagado',
 } as const;
 
+/** De dónde sale cada movimiento automático del libro. */
+export const SOURCES = {
+  purchase: 'purchase_request',
+  payment: 'payment_request',
+  cash: 'cash_payment',
+} as const;
+
+/**
+ * Los pagos en efectivo que nunca llegaron al libro.
+ *
+ * De los tres flujos de Gastos, este es el único que puede dejar un hueco.
+ * La compra entregada y el pago aprobado registran el egreso ANTES de
+ * cambiar de estado: si no hay período, no pasa nada y se reintenta. El pago
+ * en efectivo va al revés a propósito —el recibo lleva número correlativo y
+ * ya se le dio a alguien, así que se emite igual— y el asiento queda
+ * pendiente hasta que exista el período que lo contenga.
+ *
+ * Esto los busca: los del campus, con fecha adentro del período, que todavía
+ * no tienen su movimiento.
+ */
+export async function pendingCashPayments(
+  supabase: Client,
+  where: { organizationId: string; campusId: string; from: string; to: string },
+) {
+  const { data: payments } = await supabase
+    .from('cash_payments')
+    .select('id, receipt_number, payee_name, concept, amount, currency_code, paid_on')
+    .eq('organization_id', where.organizationId)
+    .eq('campus_id', where.campusId)
+    .gte('paid_on', where.from)
+    .lte('paid_on', where.to)
+    .order('paid_on');
+
+  if (!payments || payments.length === 0) return [];
+
+  const { data: already } = await supabase
+    .from('week_entries')
+    .select('source_id')
+    .eq('source_type', SOURCES.cash)
+    .in(
+      'source_id',
+      payments.map((payment) => payment.id),
+    );
+
+  const recorded = new Set((already ?? []).map((row) => row.source_id));
+  return payments.filter((payment) => !recorded.has(payment.id));
+}
+
 /**
  * Deja el gasto en el libro semanal, en el período que contiene la fecha.
  *
