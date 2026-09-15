@@ -217,6 +217,68 @@ export async function reopenSunday(_prev: FormState, formData: FormData): Promis
   return { message: 'Domingo reabierto.' };
 }
 
+/**
+ * Lo que hace que un domingo sea historia y no un error de tipeo. Devuelve
+ * el nombre de lo primero que aparezca, para poder decir por que no se borra.
+ */
+async function sundayActivity(supabase: Supabase, sundayId: string) {
+  const of = (table: 'offering_counts' | 'sales' | 'meeting_incomes' | 'meeting_sales_sessions') =>
+    supabase
+      .from(table)
+      .select('id, sunday_meetings!inner(sunday_id)', { count: 'exact', head: true })
+      .eq('sunday_meetings.sunday_id', sundayId);
+
+  const [counts, sales, incomes, sessions] = await Promise.all([
+    of('offering_counts'),
+    of('sales'),
+    of('meeting_incomes'),
+    of('meeting_sales_sessions'),
+  ]);
+
+  if (counts.count) return 'actas de conteo';
+  if (sales.count) return 'ventas';
+  if (incomes.count) return 'ingresos digitales';
+  if (sessions.count) return 'cajas de venta';
+  return null;
+}
+
+/**
+ * Borra un domingo abierto por error.
+ *
+ * Abrir el domingo equivocado (otra fecha, otro campus) es un tipeo, no un
+ * hecho: no hay nada que anular ni que dejar asentado, pero queda en la lista
+ * para siempre confundiendo al que la mira. Se borra solo mientras siga
+ * vacio; con un acta, una venta o un ingreso adentro ya es un libro y eso se
+ * anula, no se borra. Cerrado tampoco: un cierre esta firmado.
+ */
+export async function deleteSunday(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await writeContext(formData);
+  if (!ctx) return DENIED;
+
+  const sundayId = String(formData.get('sunday_id'));
+  const supabase = await createClient();
+  const sunday = await ownSunday(supabase, ctx, sundayId);
+
+  if (!sunday) return NOT_MINE;
+  if (sunday.status === 'closed') {
+    return { error: 'El domingo está cerrado. Un cierre firmado no se borra.' };
+  }
+
+  const activity = await sundayActivity(supabase, sundayId);
+  if (activity) return { error: `No se puede borrar: el domingo ya tiene ${activity}.` };
+
+  const { error } = await supabase
+    .from('sundays')
+    .delete()
+    .eq('id', sundayId)
+    .eq('organization_id', ctx.organization.id);
+
+  if (error) return fail(error);
+
+  revalidatePath(`/${ctx.organization.slug}/domingos`, 'layout');
+  redirect(`/${ctx.organization.slug}/domingos`);
+}
+
 // ============================================================
 // Acta de conteo
 // ============================================================

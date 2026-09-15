@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { canWrite, requireOrg } from '@/lib/auth';
 import {
   closeSunday,
+  deleteSunday,
   generateSundayActa,
   reopenSunday,
   updateSundayNotes,
@@ -60,6 +61,10 @@ export default async function SundayPage(props: PageProps<'/[slug]/domingos/[sun
   const finalized = (counts ?? []).filter((c) => c.status === 'finalized');
   const envelopes = finalized.reduce((sum, c) => sum + c.envelopes_count, 0);
   const closed = sunday.status === 'closed';
+  // Un domingo sin un solo movimiento ni acta es, casi siempre, una fecha o
+  // un campus mal elegidos al abrirlo. Recien ahi ofrecemos borrarlo: con
+  // algo cargado la salida es anular, no hacer desaparecer el registro.
+  const empty = (counts ?? []).length === 0 && isEmpty(totals.moved);
   const campus = campuses.find((c) => c.id === sunday.campus_id);
   const countByMeeting = new Map((counts ?? []).map((c) => [c.meeting_id, c]));
 
@@ -200,6 +205,27 @@ export default async function SundayPage(props: PageProps<'/[slug]/domingos/[sun
               <input type="hidden" name="sunday_id" value={sundayId} />
             </ActionForm>
           </Card>
+
+          {!closed && empty ? (
+            <Card className="flex flex-col gap-3 p-5">
+              <h2 className="text-sm font-medium text-zinc-900">Borrar el domingo</h2>
+              <p className="text-xs text-zinc-500">
+                Todavía no tiene nada cargado. Si lo abriste por error —otra fecha, otro
+                campus— borralo y no queda rastro. En cuanto entre la primera acta, venta o
+                ingreso, esta opción desaparece.
+              </p>
+              <ActionForm
+                action={deleteSunday}
+                submitLabel="Borrar domingo"
+                submitVariant="danger"
+                confirm="Se borra el domingo con sus reuniones. ¿Seguimos?"
+                className="items-start"
+              >
+                <input type="hidden" name="slug" value={slug} />
+                <input type="hidden" name="sunday_id" value={sundayId} />
+              </ActionForm>
+            </Card>
+          ) : null}
         </div>
       ) : null}
     </div>

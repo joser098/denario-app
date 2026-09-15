@@ -20,6 +20,8 @@ export function ActionForm({
   replaceOnSuccess = false,
   /** Vacia los campos despues de un alta exitosa. */
   resetOnSuccess = false,
+  /** Texto de la confirmacion. Solo para acciones destructivas. */
+  confirm,
   className = '',
   fieldsClassName = 'flex flex-col gap-4',
 }: {
@@ -30,10 +32,12 @@ export function ActionForm({
   footer?: ReactNode;
   replaceOnSuccess?: boolean;
   resetOnSuccess?: boolean;
+  confirm?: string;
   className?: string;
   fieldsClassName?: string;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const confirmDialog = useRef<HTMLDialogElement>(null);
   const [state, formAction, pending] = useActionState(
     async (prev: FormState, data: FormData) => {
       const next = await action(prev, data);
@@ -60,9 +64,26 @@ export function ActionForm({
       {done ? null : (
         <fieldset disabled={pending} className={`min-w-0 border-0 p-0 ${fieldsClassName}`}>
           {children}
-          <Button type="submit" variant={submitVariant} disabled={pending}>
-            {pending ? 'Guardando…' : submitLabel}
-          </Button>
+          {confirm ? (
+            // El submit de verdad vive en el dialogo: el boton de afuera solo
+            // pregunta. Mismo mecanismo que SubmitButton, pero sin perder el
+            // error ni el mensaje que trae la accion.
+            <>
+              <Button
+                type="button"
+                variant={submitVariant}
+                disabled={pending}
+                onClick={() => confirmDialog.current?.showModal()}
+              >
+                {pending ? 'Guardando…' : submitLabel}
+              </Button>
+              <ConfirmDialog dialog={confirmDialog} message={confirm} variant={submitVariant} />
+            </>
+          ) : (
+            <Button type="submit" variant={submitVariant} disabled={pending}>
+              {pending ? 'Guardando…' : submitLabel}
+            </Button>
+          )}
         </fieldset>
       )}
 

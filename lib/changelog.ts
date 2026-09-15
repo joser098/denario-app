@@ -43,6 +43,20 @@ export type Release = {
 /** De la más nueva a la más vieja: lo último es lo que se viene a mirar. */
 export const CHANGELOG: Release[] = [
   {
+    date: '2026-09-15',
+    changes: [
+      {
+        kind: 'nuevo',
+        area: 'Domingos',
+        title: 'Un domingo abierto por error se puede borrar',
+        detail:
+          'Si abriste un domingo con la fecha o el campus equivocados, ahora podés borrarlo desde la pantalla del domingo, junto al botón de cerrar. Solo aparece mientras el domingo esté abierto y no tenga nada cargado: sin actas, sin ventas y sin ingresos.',
+        action:
+          'Si el domingo ya tiene movimientos, la opción no aparece. Eso no se borra: el acta que esté mal se anula y se carga una nueva.',
+      },
+    ],
+  },
+  {
     date: '2026-09-10',
     changes: [
       {
