@@ -15,6 +15,35 @@ export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'paid';
 export type SalePaymentMethod = 'cash' | 'mercadopago';
 export type SalesSessionStatus = 'open' | 'closed';
 export type PlReportStatus = 'draft' | 'closed';
+
+// Los renglones del Profit & Loss son columnas de `pl_reports`, asi que sus
+// claves se declaran con el esquema. `lib/reports.ts` las vuelve a exportar
+// junto con el nombre que lleva cada una en la pantalla y en el PDF.
+export type RevenueKey =
+  | 'rev_tithes_offerings'
+  | 'rev_hf_operation_support'
+  | 'rev_other_donations'
+  | 'rev_conferences_events'
+  | 'rev_commercial_activities'
+  | 'rev_other_income';
+
+export type ExpenseKey =
+  | 'exp_personnel'
+  | 'exp_program'
+  | 'exp_administration'
+  | 'exp_facilities'
+  | 'exp_facilities_loans'
+  | 'exp_conferences_events'
+  | 'exp_commercial_activities'
+  | 'exp_assets_purchased'
+  | 'exp_depreciation';
+
+export type FoundationKey =
+  | 'fnd_opening_balance'
+  | 'fnd_income'
+  | 'fnd_missional_expenses'
+  | 'fnd_church_operation_support'
+  | 'fnd_capital_expenditure';
 // Check de campuses.document_type, no un enum de Postgres. La lista con el
 // pais y el nombre largo esta en lib/documents.ts.
 export type DocumentType = 'DNI' | 'CPF' | 'CC' | 'CI' | 'CURP';
@@ -227,6 +256,16 @@ export type WeekConcept = {
   has_movement_count: boolean;
   /** Si el concepto suma o resta al saldo de la semana. */
   kind: WeekConceptKind;
+  /**
+   * El renglon de ingresos del Profit & Loss que alimenta. Null = se queda
+   * en el libro semanal y no baja al reporte.
+   */
+  pl_revenue_key: RevenueKey | null;
+  /**
+   * Cuenta movimientos pero no plata: transacciones, sobres. El monto no
+   * suma a ningun total y la vista `week_amounts` ni los mira.
+   */
+  counts_only: boolean;
   sort_order: number;
   is_active: boolean;
   created_at: string;
@@ -379,7 +418,10 @@ export type PlReport = {
   id: string;
   organization_id: string;
   campus_id: string;
-  service_date: string;
+  /** El periodo del Semanal que lo origino. Null en los reportes viejos. */
+  week_id: string | null;
+  start_date: string;
+  end_date: string;
   currency_code: string;
   status: PlReportStatus;
 
@@ -436,7 +478,8 @@ export type ExchangeRate = {
   id: string;
   organization_id: string;
   currency_code: string;
-  service_date: string;
+  /** El "desde" del periodo que cotiza. */
+  period_start: string;
   /** Cuantas unidades locales equivalen a UN dolar. Para pasar a USD se divide. */
   units_per_usd: number;
   created_by: string | null;
@@ -468,6 +511,17 @@ export type WeekAmount = {
   movements: number;
 };
 
+/**
+ * Fila de la vista `week_counts`: lo que se cuenta y no es plata, una por
+ * semana y concepto. Transacciones + sobres es la participacion del reporte.
+ */
+export type WeekCount = {
+  week_id: string;
+  code: string;
+  name: string;
+  movements: number;
+};
+
 export type Week = {
   id: string;
   organization_id: string;
@@ -476,6 +530,8 @@ export type Week = {
   end_date: string;
   status: WeekStatus;
   notes: string | null;
+  /** El PDF del cierre. Existe recien cuando el periodo se cierra. */
+  pdf_path: string | null;
   closed_at: string | null;
   closed_by: string | null;
   created_at: string;
@@ -491,6 +547,11 @@ export type WeekEntry = {
   movement_count: number | null;
   entry_date: string | null;
   description: string | null;
+  /**
+   * La categoria de gasto del Profit & Loss. Solo en los egresos: es lo que
+   * decide en que renglon del reporte cae este movimiento.
+   */
+  pl_expense_key: ExpenseKey | null;
   /** De donde salio. Null = lo cargo alguien a mano en el Semanal. */
   source_type: string | null;
   source_id: string | null;
@@ -580,16 +641,17 @@ export type Database = {
       week_entries: Table<WeekEntry, 'week_id' | 'concept_id' | 'currency_code' | 'amount'>;
       pl_reports: Table<
         PlReport,
-        'organization_id' | 'campus_id' | 'service_date' | 'currency_code'
+        'organization_id' | 'campus_id' | 'start_date' | 'end_date' | 'currency_code'
       >;
       exchange_rates: Table<
         ExchangeRate,
-        'organization_id' | 'currency_code' | 'service_date' | 'units_per_usd'
+        'organization_id' | 'currency_code' | 'period_start' | 'units_per_usd'
       >;
     };
     Views: {
       meeting_amounts: { Row: MeetingAmount; Relationships: [] };
       week_amounts: { Row: WeekAmount; Relationships: [] };
+      week_counts: { Row: WeekCount; Relationships: [] };
     };
     Functions: {
       create_organization: {
@@ -611,6 +673,11 @@ export type Database = {
       open_sunday: {
         Args: { p_campus: string; p_date: string };
         Returns: string;
+      };
+      /** Abre el periodo en todos los campus, con su Profit & Loss. */
+      open_period: {
+        Args: { p_org: string; p_start: string; p_end: string };
+        Returns: number;
       };
       org_members_with_email: {
         Args: { p_org: string };

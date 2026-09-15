@@ -11,7 +11,9 @@ import type { FormState } from '@/lib/forms';
 import { LOGO_BUCKET } from '@/lib/logo';
 import { parseAmount } from '@/lib/money';
 import { nextOrder, reorder } from '@/lib/order';
+import { REVENUE_BY_KEY } from '@/lib/reports';
 import { RESERVED_SLUGS, slugify } from '@/lib/slug';
+import type { RevenueKey } from '@/lib/database.types';
 
 /**
  * Toda accion de configuracion entra por aca: resuelve la organizacion del
@@ -492,6 +494,18 @@ function currencies(formData: FormData): string[] {
   return values.length ? values : ['ARS'];
 }
 
+/**
+ * El renglon de ingresos del Profit & Loss al que baja este concepto.
+ *
+ * Vacio es una respuesta valida: un concepto puede quedarse en el libro
+ * semanal y no llegar al reporte. Lo que no puede es apuntar a un renglon que
+ * no existe, asi que lo que no este en la lista se guarda como vacio.
+ */
+function revenueKey(formData: FormData): RevenueKey | null {
+  const key = String(formData.get('pl_revenue_key') ?? '');
+  return REVENUE_BY_KEY.has(key as RevenueKey) ? (key as RevenueKey) : null;
+}
+
 export async function createWeekConcept(
   _prev: FormState,
   formData: FormData,
@@ -514,6 +528,10 @@ export async function createWeekConcept(
     name,
     allowed_currencies: currencies(formData),
     has_movement_count: formData.get('has_movement_count') === 'on',
+    // Un egreso no apunta a un renglon de ingresos: su categoria del reporte
+    // la elige cada movimiento, porque dos compras pueden caer en renglones
+    // distintos.
+    pl_revenue_key: formData.get('kind') === 'expense' ? null : revenueKey(formData),
     // El tipo no se edita despues: cambiarlo daria vuelta el signo de todo
     // lo ya cargado con ese concepto.
     kind: formData.get('kind') === 'expense' ? 'expense' : 'income',
@@ -540,6 +558,7 @@ export async function updateWeekConcept(
       name: String(formData.get('name') ?? '').trim(),
       allowed_currencies: currencies(formData),
       has_movement_count: formData.get('has_movement_count') === 'on',
+      pl_revenue_key: revenueKey(formData),
     })
     .eq('id', String(formData.get('id')))
     .eq('organization_id', ctx.organization.id);

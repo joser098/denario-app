@@ -1,4 +1,15 @@
-import type { Campus, PlReport } from '@/lib/database.types';
+import type {
+  Campus,
+  ExpenseKey,
+  FoundationKey,
+  PlReport,
+  RevenueKey,
+} from '@/lib/database.types';
+
+// Las claves son columnas de `pl_reports` y se declaran con el esquema. Se
+// vuelven a exportar de aca porque este es el modulo del reporte: el resto
+// de la app pide "los renglones del P&L", no el tipo de una columna.
+export type { ExpenseKey, FoundationKey, RevenueKey };
 
 /**
  * El Profit & Loss report que cada campus manda el miercoles.
@@ -15,32 +26,6 @@ export type ReportField = {
   es: string;
   en: string;
 };
-
-export type RevenueKey =
-  | 'rev_tithes_offerings'
-  | 'rev_hf_operation_support'
-  | 'rev_other_donations'
-  | 'rev_conferences_events'
-  | 'rev_commercial_activities'
-  | 'rev_other_income';
-
-export type ExpenseKey =
-  | 'exp_personnel'
-  | 'exp_program'
-  | 'exp_administration'
-  | 'exp_facilities'
-  | 'exp_facilities_loans'
-  | 'exp_conferences_events'
-  | 'exp_commercial_activities'
-  | 'exp_assets_purchased'
-  | 'exp_depreciation';
-
-export type FoundationKey =
-  | 'fnd_opening_balance'
-  | 'fnd_income'
-  | 'fnd_missional_expenses'
-  | 'fnd_church_operation_support'
-  | 'fnd_capital_expenditure';
 
 export const REVENUE_FIELDS: ReportField[] = [
   { key: 'rev_tithes_offerings', es: 'Diezmos y ofrendas', en: 'Tithes and Offerings' },
@@ -123,6 +108,16 @@ export const FOUNDATION_CLOSING: Omit<ReportField, 'key'> = {
   es: 'Saldo final de la Fundación',
   en: 'Hillsong Foundation C/Bal',
 };
+
+/** Los renglones de egreso, indexados: de la clave guardada al nombre. */
+export const EXPENSE_BY_KEY = new Map(EXPENSE_FIELDS.map((field) => [field.key, field]));
+
+export const REVENUE_BY_KEY = new Map(REVENUE_FIELDS.map((field) => [field.key, field]));
+
+/** El nombre corto de una categoria de gasto, para las pantallas. */
+export function expenseLabel(key: ExpenseKey | null): string {
+  return key ? (EXPENSE_BY_KEY.get(key)?.es ?? key) : 'Sin categoría';
+}
 
 /** "Otras donaciones (Other Donations)" */
 export function fieldLabel(field: ReportField): string {

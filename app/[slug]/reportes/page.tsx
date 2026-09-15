@@ -1,28 +1,16 @@
 import Link from 'next/link';
-import { canWrite, requireOrg } from '@/lib/auth';
-import { openReport } from '@/lib/actions/reports';
+import { requireOrg } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { formatLong, lastSunday, todayIn } from '@/lib/dates';
+import { formatRange } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { REPORT_STATUS_LABELS, reportTotals } from '@/lib/reports';
-import { ActionForm } from '@/components/form';
 
 export const metadata = { title: 'Profit & Loss' };
-import {
-  Badge,
-  Card,
-  EmptyState,
-  Field,
-  Input,
-  LinkButton,
-  PageHeader,
-  Select,
-} from '@/components/ui';
+import { Badge, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui';
 
 export default async function ReportsPage(props: PageProps<'/[slug]/reportes'>) {
   const { slug } = await props.params;
-  const { organization, campuses, campusId, role } = await requireOrg(slug);
-  const writes = canWrite(role);
+  const { organization, campuses, campusId } = await requireOrg(slug);
 
   const supabase = await createClient();
   // RLS ya recorta por campus; el filtro esta para que la consulta diga lo
@@ -35,7 +23,7 @@ export default async function ReportsPage(props: PageProps<'/[slug]/reportes'>) 
   if (campusId) query.eq('campus_id', campusId);
 
   const { data: reports } = await query
-    .order('service_date', { ascending: false })
+    .order('start_date', { ascending: false })
     .limit(40);
 
   const campusName = (id: string) => campuses.find((c) => c.id === id)?.name ?? 'Campus';
@@ -44,7 +32,7 @@ export default async function ReportsPage(props: PageProps<'/[slug]/reportes'>) 
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Profit & Loss"
-        subtitle="Un reporte por domingo y campus. Se manda el miércoles siguiente."
+        subtitle="Un reporte por período y campus. Se abre y se llena desde el Semanal."
         actions={
           // El que esta acotado a un campus no tiene nada que consolidar.
           campusId ? null : (
@@ -55,49 +43,10 @@ export default async function ReportsPage(props: PageProps<'/[slug]/reportes'>) 
         }
       />
 
-      {writes ? (
-        <Card className="p-5">
-          <h2 className="mb-4 text-sm font-medium text-zinc-900">Abrir un reporte</h2>
-          <ActionForm
-            action={openReport}
-            submitLabel="Abrir reporte"
-            fieldsClassName="flex flex-wrap items-end gap-3"
-          >
-            <input type="hidden" name="slug" value={slug} />
-            <Field label="Domingo">
-              <Input
-                name="service_date"
-                type="date"
-                defaultValue={lastSunday(todayIn(organization.timezone))}
-                className="w-44"
-                required
-              />
-            </Field>
-            <Field label="Campus">
-              <Select
-                name="campus_id"
-                defaultValue={campusId ?? campuses[0]?.id ?? ''}
-                className="w-56"
-                required
-              >
-                {campuses.map((campus) => (
-                  <option key={campus.id} value={campus.id}>
-                    {campus.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <p className="w-full text-xs text-zinc-500 sm:w-auto sm:self-center">
-              Nace vacío: los números se cargan adentro.
-            </p>
-          </ActionForm>
-        </Card>
-      ) : null}
-
       {(reports ?? []).length === 0 ? (
         <EmptyState
           title="Todavía no hay ningún reporte."
-          description="Abrí el domingo que corresponda y cargá los ingresos y egresos de la semana."
+          description="El reporte nace con el período: cuando un administrador abre uno en Semanal, cada campus tiene el suyo esperando."
         />
       ) : (
         <Card className="divide-y divide-zinc-100">
@@ -113,7 +62,7 @@ export default async function ReportsPage(props: PageProps<'/[slug]/reportes'>) 
               >
                 <div>
                   <p className="text-sm font-medium text-zinc-900">
-                    {formatLong(report.service_date)}
+                    {formatRange({ start: report.start_date, end: report.end_date })}
                   </p>
                   <p className="text-xs text-zinc-500">{campusName(report.campus_id)}</p>
                 </div>

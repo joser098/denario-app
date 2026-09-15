@@ -11,7 +11,12 @@ export type ConceptOption = {
   kind: 'income' | 'expense';
   allowed_currencies: string[];
   has_movement_count: boolean;
+  /** Cuenta movimientos y no plata: transacciones, sobres. */
+  counts_only: boolean;
 };
+
+/** Las categorías de gasto del Profit & Loss, para el selector. */
+export type CategoryOption = { key: string; name: string };
 
 /**
  * Alta de un movimiento del periodo. Los campos dependen del concepto
@@ -23,12 +28,14 @@ export function WeekEntryForm({
   slug,
   weekId,
   concepts,
+  categories,
   range,
 }: {
   action: (prev: FormState, data: FormData) => Promise<FormState>;
   slug: string;
   weekId: string;
   concepts: ConceptOption[];
+  categories: CategoryOption[];
   range: { start: string; end: string };
 }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -85,27 +92,61 @@ export function WeekEntryForm({
           </Select>
         </Field>
 
-        <Field label="Moneda">
-          {/* key: al cambiar de concepto vuelve a la primera moneda habilitada */}
-          <Select key={concept.id} name="currency_code" className="w-28">
-            {concept.allowed_currencies.map((currency) => (
-              <option key={currency} value={currency}>
-                {currency}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {/*
+          Lo que solo se cuenta (transacciones, sobres) no lleva moneda ni
+          monto: no es plata. Pedirle un importe sería contar dos veces algo
+          que ya está en otra línea del libro.
+        */}
+        {concept.counts_only ? null : (
+          <>
+            <Field label="Moneda">
+              {/* key: al cambiar de concepto vuelve a la primera moneda habilitada */}
+              <Select key={concept.id} name="currency_code" className="w-28">
+                {concept.allowed_currencies.map((currency) => (
+                  <option key={currency} value={currency}>
+                    {currency}
+                  </option>
+                ))}
+              </Select>
+            </Field>
 
-        <Field
-          label="Monto"
-          hint={concept.kind === 'expense' ? 'Se resta del saldo.' : undefined}
-        >
-          <MoneyInput name="amount" className="w-36 text-right" required />
-        </Field>
+            <Field
+              label="Monto"
+              hint={concept.kind === 'expense' ? 'Se resta del saldo.' : undefined}
+            >
+              <MoneyInput name="amount" className="w-36 text-right" required />
+            </Field>
+          </>
+        )}
+
+        {concept.kind === 'expense' ? (
+          <Field label="Categoría" hint="El renglón del Profit & Loss.">
+            <Select key={`cat-${concept.id}`} name="pl_expense_key" className="w-56" required>
+              {categories.map((category) => (
+                <option key={category.key} value={category.key}>
+                  {category.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ) : null}
 
         {concept.has_movement_count ? (
-          <Field label="Movimientos" hint="Cuántas operaciones componen el monto.">
-            <Input name="movement_count" type="number" min={0} className="w-32" />
+          <Field
+            label={concept.counts_only ? 'Cantidad' : 'Movimientos'}
+            hint={
+              concept.counts_only
+                ? 'Cuántas fueron. No suma plata.'
+                : 'Cuántas operaciones componen el monto.'
+            }
+          >
+            <Input
+              name="movement_count"
+              type="number"
+              min={concept.counts_only ? 1 : 0}
+              className="w-32"
+              required={concept.counts_only}
+            />
           </Field>
         ) : null}
 

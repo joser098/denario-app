@@ -11,7 +11,30 @@ import { ActionForm, SubmitButton } from '@/components/form';
 import { ModalButton } from '@/components/modal';
 import { MoveButtons } from '@/components/reorder';
 import { Badge, Card, Field, Input, Select } from '@/components/ui';
+import { REVENUE_FIELDS } from '@/lib/reports';
 import { CONCEPT_KIND_LABELS } from '@/lib/weeks';
+
+/**
+ * A que renglon de ingresos del Profit & Loss baja lo cargado con este
+ * concepto. Vacio = se queda en el libro semanal.
+ *
+ * Los egresos no lo llevan: su renglon lo elige cada movimiento, porque dos
+ * compras del mismo origen pueden ser una de personal y otra de programas.
+ */
+function RevenueTarget({ selected }: { selected: string | null }) {
+  return (
+    <Field label="Baja al Profit & Loss" hint="El renglón de ingresos del reporte.">
+      <Select name="pl_revenue_key" defaultValue={selected ?? ''} className="w-60">
+        <option value="">No baja al reporte</option>
+        {REVENUE_FIELDS.map((field) => (
+          <option key={field.key} value={field.key}>
+            {field.es}
+          </option>
+        ))}
+      </Select>
+    </Field>
+  );
+}
 
 export const metadata = { title: 'Conceptos' };
 
@@ -55,9 +78,10 @@ export default async function ConceptsSettingsPage(
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <p className="max-w-2xl text-sm text-zinc-500">
-          Las categorías del módulo Semanal. El código y el tipo no se pueden cambiar: el código
-          identifica al concepto en los registros ya cargados, y cambiar el tipo daría vuelta el
-          signo de todo lo cargado con él.
+          Las categorías del módulo Semanal, y a qué renglón del Profit &amp; Loss baja cada una.
+          El código y el tipo no se pueden cambiar: el código identifica al concepto en los
+          registros ya cargados, y cambiar el tipo daría vuelta el signo de todo lo cargado con
+          él.
         </p>
         <ModalButton label="Agregar concepto" title="Agregar concepto">
           <ActionForm action={createWeekConcept} submitLabel="Agregar concepto" resetOnSuccess>
@@ -72,6 +96,7 @@ export default async function ConceptsSettingsPage(
               </Select>
             </Field>
             <CurrencyChecks codes={codes} selected={['ARS']} />
+            <RevenueTarget selected="rev_tithes_offerings" />
             <label className="flex items-center gap-2 text-sm text-zinc-700">
               <input
                 type="checkbox"
@@ -98,7 +123,16 @@ export default async function ConceptsSettingsPage(
               <Field label="Concepto" hint={concept.code}>
                 <Input name="name" defaultValue={concept.name} className="w-52" required />
               </Field>
-              <CurrencyChecks codes={codes} selected={concept.allowed_currencies} />
+              {/*
+                Lo que solo se cuenta (transacciones, sobres) no lleva moneda
+                ni renglón: no es plata. Lo único suyo es cuántos fueron.
+              */}
+              {concept.counts_only ? null : (
+                <CurrencyChecks codes={codes} selected={concept.allowed_currencies} />
+              )}
+              {concept.kind === 'expense' || concept.counts_only ? null : (
+                <RevenueTarget selected={concept.pl_revenue_key} />
+              )}
               <label className="flex h-10 items-center gap-2 text-sm text-zinc-700">
                 <input
                   type="checkbox"
@@ -111,8 +145,12 @@ export default async function ConceptsSettingsPage(
             </ActionForm>
 
             <div className="flex items-center gap-3">
-              <Badge tone={concept.kind === 'expense' ? 'red' : 'blue'}>
-                {CONCEPT_KIND_LABELS[concept.kind]}
+              <Badge
+                tone={
+                  concept.counts_only ? 'neutral' : concept.kind === 'expense' ? 'red' : 'blue'
+                }
+              >
+                {concept.counts_only ? 'Dato de control' : CONCEPT_KIND_LABELS[concept.kind]}
               </Badge>
               <MoveButtons
                 action={moveWeekConcept}

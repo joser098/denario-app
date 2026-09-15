@@ -3,10 +3,11 @@ import { notFound } from 'next/navigation';
 import { canAdmin, canWrite, requireOrg } from '@/lib/auth';
 import { closeReport, reopenReport, saveReport } from '@/lib/actions/reports';
 import { createClient } from '@/lib/supabase/server';
-import { formatLong } from '@/lib/dates';
+import { formatRange } from '@/lib/dates';
 import { REPORT_STATUS_LABELS } from '@/lib/reports';
+import { loadWeek } from '@/lib/week-data';
 import { ActionForm } from '@/components/form';
-import { ReportForm } from '@/components/report-form';
+import { ReportForm, type WeekNumbers } from '@/components/report-form';
 import { Badge, LinkButton, PageHeader } from '@/components/ui';
 
 export const metadata = { title: 'Reporte' };
@@ -25,6 +26,20 @@ export default async function ReportPage(props: PageProps<'/[slug]/reportes/[rep
 
   if (!report) notFound();
 
+  // El período del que sale este reporte. Sus números se muestran al lado de
+  // cada campo: el reporte se puede ajustar a mano, y una diferencia con el
+  // libro tiene que verse mientras se tipea, no después.
+  const period = report.week_id
+    ? await loadWeek(supabase, organization.id, report.week_id)
+    : null;
+
+  const fromWeek: WeekNumbers | null = period
+    ? {
+        amounts: { ...period.summary.revenue, ...period.summary.expenses },
+        participants: period.summary.participants,
+      }
+    : null;
+
   const campus = campuses.find((c) => c.id === report.campus_id);
   const closed = report.status === 'closed';
   const readOnly = closed || !canWrite(role);
@@ -36,7 +51,7 @@ export default async function ReportPage(props: PageProps<'/[slug]/reportes/[rep
           ← Profit &amp; Loss
         </Link>
         <PageHeader
-          title={formatLong(report.service_date)}
+          title={formatRange({ start: report.start_date, end: report.end_date })}
           subtitle={`${campus?.name ?? 'Campus'} · montos en ${report.currency_code}`}
           actions={
             <div className="flex items-center gap-2">
@@ -55,12 +70,25 @@ export default async function ReportPage(props: PageProps<'/[slug]/reportes/[rep
         />
       </div>
 
+      {period ? (
+        <p className="-mt-3 text-sm text-zinc-500">
+          Los renglones que trae el Semanal se escriben acá al cerrar el período.{' '}
+          <Link
+            href={`/${slug}/semanal/${period.week.id}`}
+            className="font-medium text-brand-600 hover:underline"
+          >
+            Ver el período →
+          </Link>
+        </p>
+      ) : null}
+
       <ReportForm
         save={saveReport}
         close={closeReport}
         slug={slug}
         report={report}
         readOnly={readOnly}
+        fromWeek={fromWeek}
       />
 
       {closed && canAdmin(role) ? (

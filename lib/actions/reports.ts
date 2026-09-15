@@ -59,39 +59,43 @@ async function ownReport(supabase: Supabase, ctx: OrgContext, id: string) {
 }
 
 /**
- * Abre el reporte de un domingo. Nace vacio y en borrador: los numeros los
- * arma la tesoreria del campus aparte y los carga aca.
+ * Abre el reporte de un periodo que se quedo sin el.
+ *
+ * Normalmente no hace falta: el reporte nace junto con el periodo, cuando un
+ * administrador lo abre en Semanal. Esto es para los periodos que vienen de
+ * antes de que los dos modulos estuvieran atados, que no tienen ninguno.
+ *
+ * Nace vacio y en borrador. Se llena solo al cerrar el periodo; hasta
+ * entonces se puede cargar a mano lo que no salga del Semanal.
  */
 export async function openReport(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await writeContext(formData);
   if (!ctx) return DENIED;
 
-  const campusId = String(formData.get('campus_id') ?? '');
-  if (!campusId) return { error: 'Elegí el campus.' };
-  if (!inCampus(ctx, campusId)) return { error: 'Ese campus no es el tuyo.' };
-
-  const date = String(formData.get('service_date') ?? '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: 'Elegí el domingo del reporte.' };
-  // El check de la base tambien lo exige; el mensaje sale mejor desde aca.
-  if (new Date(`${date}T12:00:00`).getUTCDay() !== 0) {
-    return { error: 'La fecha tiene que ser un domingo.' };
-  }
+  const weekId = String(formData.get('week_id') ?? '');
+  if (!weekId) return { error: 'Falta el período.' };
 
   const supabase = await createClient();
-  const { data: campus } = await supabase
-    .from('campuses')
-    .select('default_currency')
-    .eq('id', campusId)
+  const { data: week } = await supabase
+    .from('weeks')
+    .select('id, campus_id, start_date, end_date, campuses!inner(default_currency)')
+    .eq('id', weekId)
+    .eq('organization_id', ctx.organization.id)
     .maybeSingle();
 
-  if (!campus) return { error: 'Ese campus no existe.' };
+  if (!week) return { error: 'Ese período no existe.' };
+  if (!inCampus(ctx, week.campus_id)) return { error: 'Ese período no es de tu campus.' };
+
+  const campus = week.campuses as unknown as { default_currency: string };
 
   const { data: report, error } = await supabase
     .from('pl_reports')
     .insert({
       organization_id: ctx.organization.id,
-      campus_id: campusId,
-      service_date: date,
+      campus_id: week.campus_id,
+      week_id: week.id,
+      start_date: week.start_date,
+      end_date: week.end_date,
       currency_code: campus.default_currency,
       created_by: ctx.userId,
     })
@@ -99,11 +103,12 @@ export async function openReport(_prev: FormState, formData: FormData): Promise<
     .single();
 
   if (error) {
-    if (error.code === '23505') return { error: 'Ese domingo ya tiene reporte en este campus.' };
+    if (error.code === '23505') return { error: 'Ese período ya tiene reporte.' };
     return { error: error.message };
   }
 
   revalidatePath(`/${ctx.organization.slug}/reportes`);
+  revalidatePath(`/${ctx.organization.slug}/semanal/${weekId}`);
   redirect(reportPath(ctx, report.id));
 }
 
@@ -225,10 +230,11 @@ export async function reopenReport(_prev: FormState, formData: FormData): Promis
 // ============================================================
 
 /**
- * Carga o corrige la cotizacion de una moneda para un domingo.
+ * Carga o corrige la cotizacion de una moneda para un periodo.
  *
- * Es de administradores porque decide cuanto pesa cada campus en el
- * consolidado: cambiarla mueve el numero que ve toda la organizacion.
+ * Es de administradores porque decide dos cosas a la vez: cuanto vale en
+ * moneda local lo que se cargo en otra dentro del Semanal, y cuanto pesa
+ * cada campus en el consolidado en dolares. Cambiarla mueve los dos.
  */
 export async function saveExchangeRate(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await requireOrg(String(formData.get('slug') ?? ''));
@@ -240,8 +246,8 @@ export async function saveExchangeRate(_prev: FormState, formData: FormData): Pr
   if (!/^[A-Z]{3}$/.test(currency)) return { error: 'Elegí la moneda.' };
   if (currency === 'USD') return { error: 'El dólar no se cotiza contra sí mismo.' };
 
-  const date = String(formData.get('service_date') ?? '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: 'Elegí el domingo.' };
+  const date = String(formData.get('period_start') ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: 'Elegí el período.' };
 
   // parseAmount y no un replace a mano: el campo llega con separadores de
   // miles, y sacar solo la coma leia "4.100" como 4,1.
@@ -257,15 +263,18 @@ export async function saveExchangeRate(_prev: FormState, formData: FormData): Pr
       {
         organization_id: ctx.organization.id,
         currency_code: currency,
-        service_date: date,
+        period_start: date,
         units_per_usd: rate,
         created_by: ctx.userId,
       },
-      { onConflict: 'organization_id,currency_code,service_date' },
+      { onConflict: 'organization_id,currency_code,period_start' },
     );
 
   if (error) return { error: error.message };
 
+  // La cotizacion se usa en las dos puntas: convierte dentro del Semanal y
+  // consolida en el reporte. Las dos pantallas tienen que verla al toque.
+  revalidatePath(`/${ctx.organization.slug}/semanal`, 'layout');
   revalidatePath(`/${ctx.organization.slug}/reportes/consolidado`);
   return { message: `Cotización de ${currency} guardada.` };
 }

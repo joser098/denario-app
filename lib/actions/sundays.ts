@@ -8,6 +8,11 @@ import { createClient } from '@/lib/supabase/server';
 import { parseCountLines } from '@/lib/count-lines';
 import { campusCurrencies, listDenominations } from '@/lib/currencies';
 import { attachCountActa, attachSundayActa } from '@/lib/pdf/actas';
+import {
+  removeSundayFromWeek,
+  requireOpenWeek,
+  syncSundayIntoWeek,
+} from '@/lib/sunday-to-week';
 import type { FormState } from '@/lib/forms';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -73,7 +78,7 @@ async function openMeeting(supabase: Supabase, ctx: OrgContext, meetingId: strin
 async function ownSunday(supabase: Supabase, ctx: OrgContext, sundayId: string) {
   const { data } = await supabase
     .from('sundays')
-    .select('id, status, campus_id')
+    .select('id, status, campus_id, service_date')
     .eq('id', sundayId)
     .eq('organization_id', ctx.organization.id)
     .maybeSingle();
@@ -160,7 +165,8 @@ export async function closeSunday(_prev: FormState, formData: FormData): Promise
 
   const sundayId = String(formData.get('sunday_id'));
   const supabase = await createClient();
-  if (!(await ownSunday(supabase, ctx, sundayId))) return NOT_MINE;
+  const sunday = await ownSunday(supabase, ctx, sundayId);
+  if (!sunday) return NOT_MINE;
 
   // Un domingo cerrado con actas a medio hacer no cierra nada: esas actas ya
   // no se van a poder tocar y el total del domingo queda mintiendo.
@@ -176,19 +182,38 @@ export async function closeSunday(_prev: FormState, formData: FormData): Promise
     };
   }
 
+  // El domingo baja al libro semanal antes de cerrarse, no despues: si no
+  // hay periodo abierto que lo contenga, el cierre no tiene que pasar. Un
+  // domingo cerrado cuya plata no llego al Semanal es plata perdida de vista
+  // y nadie se entera hasta el cierre del mes.
+  const fed = await syncSundayIntoWeek(supabase, {
+    id: sundayId,
+    organization_id: ctx.organization.id,
+    campus_id: sunday.campus_id,
+    service_date: sunday.service_date,
+  });
+
+  if (fed.error) return { error: fed.error };
+
   const { error } = await supabase
     .from('sundays')
     .update({ status: 'closed', closed_at: new Date().toISOString(), closed_by: ctx.userId })
     .eq('id', sundayId)
     .eq('organization_id', ctx.organization.id);
 
-  if (error) return fail(error);
+  if (error) {
+    // El domingo no cerro: lo que acaba de bajar al Semanal no corresponde a
+    // ningun cierre y no puede quedar contado.
+    await removeSundayFromWeek(supabase, sundayId);
+    return fail(error);
+  }
 
   await supabase.from('sunday_meetings').update({ status: 'locked' }).eq('sunday_id', sundayId);
   await attachSundayActa(supabase, sundayId, { closedBy: ctx.email });
 
   revalidatePath(`/${ctx.organization.slug}/domingos`, 'layout');
-  return { message: 'Domingo cerrado.' };
+  revalidatePath(`/${ctx.organization.slug}/semanal`, 'layout');
+  return { message: 'Domingo cerrado. El efectivo, lo digital y las ventas bajaron al Semanal.' };
 }
 
 export async function reopenSunday(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -201,7 +226,24 @@ export async function reopenSunday(_prev: FormState, formData: FormData): Promis
 
   const sundayId = String(formData.get('sunday_id'));
   const supabase = await createClient();
-  if (!(await ownSunday(supabase, ctx, sundayId))) return NOT_MINE;
+  const sunday = await ownSunday(supabase, ctx, sundayId);
+  if (!sunday) return NOT_MINE;
+
+  // Reabrir saca del Semanal lo que este domingo habia dejado, y eso no se
+  // puede hacer contra un periodo ya cerrado: su PDF quedaria diciendo un
+  // total que la pantalla ya no muestra.
+  const found = await requireOpenWeek(
+    supabase,
+    {
+      id: sundayId,
+      organization_id: ctx.organization.id,
+      campus_id: sunday.campus_id,
+      service_date: sunday.service_date,
+    },
+    'reabrir',
+  );
+
+  if ('error' in found) return { error: found.error };
 
   const { error } = await supabase
     .from('sundays')
@@ -213,8 +255,14 @@ export async function reopenSunday(_prev: FormState, formData: FormData): Promis
 
   await supabase.from('sunday_meetings').update({ status: 'open' }).eq('sunday_id', sundayId);
 
+  // Lo que habia bajado al Semanal se retira: mientras el domingo vuelve a
+  // estar abierto sus numeros pueden cambiar, y el libro no puede estar
+  // contando un total que todavia se mueve. Vuelve solo al cerrarlo.
+  await removeSundayFromWeek(supabase, sundayId);
+
   revalidatePath(`/${ctx.organization.slug}/domingos`, 'layout');
-  return { message: 'Domingo reabierto.' };
+  revalidatePath(`/${ctx.organization.slug}/semanal`, 'layout');
+  return { message: 'Domingo reabierto. Sus movimientos salieron del Semanal.' };
 }
 
 /**

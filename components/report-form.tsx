@@ -32,18 +32,34 @@ import type { PlReport } from '@/lib/database.types';
  * Los totales se recalculan mientras se tipea: uno que aparece recién después
  * de guardar llega tarde para lo que sirve.
  */
+/**
+ * Lo que dice el Semanal de este mismo período, para poder comparar.
+ *
+ * Los renglones que alimenta el Semanal se escriben en el reporte al cerrar
+ * el período, pero después se pueden corregir a mano. Mostrar al lado el
+ * número de origen es lo que deja ver que se corrigieron: sin eso, una
+ * diferencia entre el libro y el reporte no se nota hasta que alguien los
+ * cruza a mano, que es nunca.
+ */
+export type WeekNumbers = {
+  amounts: Partial<Record<string, number>>;
+  participants: number;
+};
+
 export function ReportForm({
   save,
   close,
   slug,
   report,
   readOnly,
+  fromWeek,
 }: {
   save: (prev: FormState, data: FormData) => Promise<FormState>;
   close: (prev: FormState, data: FormData) => Promise<FormState>;
   slug: string;
   report: PlReport;
   readOnly: boolean;
+  fromWeek?: WeekNumbers | null;
 }) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -93,19 +109,30 @@ export function ReportForm({
   const souls = num(salvations);
 
   const amounts = (fields: ReportField[], { negative = false } = {}) =>
-    fields.map((field) => (
-      <Cell key={field.key} es={field.es} en={field.en}>
-        <MoneyInput
-          name={field.key}
-          defaultValue={report[field.key]}
-          onValueChange={(next) => setValues((prev) => ({ ...prev, [field.key]: next }))}
-          allowNegative={negative}
-          disabled={readOnly}
-          compact
-          className="text-right tabular-nums"
-        />
-      </Cell>
-    ));
+    fields.map((field) => {
+      const expected = fromWeek?.amounts[field.key];
+
+      return (
+        <Cell key={field.key} es={field.es} en={field.en}>
+          <MoneyInput
+            name={field.key}
+            defaultValue={report[field.key]}
+            onValueChange={(next) => setValues((prev) => ({ ...prev, [field.key]: next }))}
+            allowNegative={negative}
+            disabled={readOnly}
+            compact
+            className="text-right tabular-nums"
+          />
+          {expected === undefined ? null : (
+            <FromWeek
+              expected={expected}
+              current={signed(values[field.key] ?? '')}
+              currency={currency}
+            />
+          )}
+        </Cell>
+      );
+    });
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -148,6 +175,9 @@ export function ReportForm({
                   compact
                   className="text-right tabular-nums"
                 />
+                {fromWeek ? (
+                  <FromWeek expected={fromWeek.participants} current={joined} />
+                ) : null}
               </Cell>
               <Derived
                 es="% de participación"
@@ -296,6 +326,36 @@ function Cell({ es, en, children }: { es: string; en: string; children: React.Re
       <span className="mb-0.5 text-[10px] leading-none text-zinc-500">{en}</span>
       {children}
     </label>
+  );
+}
+
+/**
+ * El número que trae el Semanal, debajo del campo.
+ *
+ * En gris cuando coinciden y en ámbar cuando no: una diferencia no es un
+ * error —el reporte se puede ajustar a mano— pero tiene que verse.
+ */
+function FromWeek({
+  expected,
+  current,
+  currency,
+}: {
+  expected: number;
+  current: number;
+  currency?: string;
+}) {
+  // Los montos se comparan al centavo; los dos vienen ya redondeados.
+  const same = Math.abs(expected - current) < 0.005;
+  const value = currency ? formatMoney(expected, currency) : String(expected);
+
+  return (
+    <span
+      className={`text-[10px] leading-tight ${same ? 'text-zinc-500' : 'text-amber-600'}`}
+      title={same ? 'Coincide con el Semanal.' : 'No coincide con el Semanal.'}
+    >
+      Semanal: {value}
+      {same ? '' : ' ⚠'}
+    </span>
   );
 }
 

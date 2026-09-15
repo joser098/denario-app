@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { canAdmin, requireOrg } from '@/lib/auth';
 import { saveExchangeRate } from '@/lib/actions/reports';
 import { createClient } from '@/lib/supabase/server';
-import { formatLong, lastSunday, todayIn } from '@/lib/dates';
+import { formatRange } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import {
   consolidate,
@@ -14,7 +14,7 @@ import {
 } from '@/lib/reports';
 import { ActionForm } from '@/components/form';
 import { MoneyInput } from '@/components/money-input';
-import { Alert, Card, Field, Input, LinkButton, PageHeader, Select } from '@/components/ui';
+import { Alert, Card, Field, LinkButton, PageHeader, Select } from '@/components/ui';
 
 export const metadata = { title: 'Consolidado' };
 
@@ -32,26 +32,40 @@ export default async function ConsolidatedPage(
   props: PageProps<'/[slug]/reportes/consolidado'>,
 ) {
   const { slug } = await props.params;
-  const { fecha } = await props.searchParams;
+  const { periodo } = await props.searchParams;
   const { organization, campuses, campusId, role } = await requireOrg(slug);
 
   if (campusId) redirect(`/${slug}/reportes`);
 
-  const requested = typeof fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : null;
-  const date = requested ?? lastSunday(todayIn(organization.timezone));
-
   const supabase = await createClient();
+
+  // Los períodos que existen, para elegir cuál mirar. Son los mismos en todos
+  // los campus —los abre un administrador de una vez— así que alcanza con
+  // juntar las fechas distintas.
+  const { data: opened } = await supabase
+    .from('weeks')
+    .select('start_date, end_date')
+    .eq('organization_id', organization.id)
+    .order('start_date', { ascending: false })
+    .limit(200);
+
+  const periods = [...new Map((opened ?? []).map((w) => [w.start_date, w])).values()];
+  const requested =
+    typeof periodo === 'string' && periods.some((p) => p.start_date === periodo) ? periodo : null;
+  const period = periods.find((p) => p.start_date === requested) ?? periods[0] ?? null;
+  const date = period?.start_date ?? '';
+
   const [{ data: reports }, { data: rates }] = await Promise.all([
     supabase
       .from('pl_reports')
       .select('*')
       .eq('organization_id', organization.id)
-      .eq('service_date', date),
+      .eq('start_date', date),
     supabase
       .from('exchange_rates')
       .select('currency_code, units_per_usd')
       .eq('organization_id', organization.id)
-      .eq('service_date', date),
+      .eq('period_start', date),
   ]);
 
   // El dólar no lleva cotización: vale uno.
@@ -72,7 +86,7 @@ export default async function ConsolidatedPage(
   const data = consolidate(items);
   const shown = items.filter((i) => i.report);
 
-  // Las monedas de este domingo que todavía no tienen cotización.
+  // Las monedas de este período que todavía no tienen cotización.
   const pending = [
     ...new Set(
       shown
@@ -104,11 +118,21 @@ export default async function ConsolidatedPage(
         </Link>
         <PageHeader
           title="Consolidado"
-          subtitle={`${formatLong(date)} · toda la organización, en dólares`}
+          subtitle={
+            period
+              ? `${formatRange({ start: period.start_date, end: period.end_date })} · toda la organización, en dólares`
+              : 'Toda la organización, en dólares'
+          }
           actions={
             <div className="flex items-end gap-2">
               <form className="flex items-end gap-2">
-                <Input name="fecha" type="date" defaultValue={date} className="w-44" />
+                <Select name="periodo" defaultValue={date} className="w-56">
+                  {periods.map((option) => (
+                    <option key={option.start_date} value={option.start_date}>
+                      {formatRange({ start: option.start_date, end: option.end_date })}
+                    </option>
+                  ))}
+                </Select>
                 <button
                   type="submit"
                   className="h-10 rounded-lg border border-zinc-200 px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
@@ -117,7 +141,7 @@ export default async function ConsolidatedPage(
                 </button>
               </form>
               {shown.length > 0 ? (
-                <LinkButton href={`/${slug}/consolidado?fecha=${date}`} variant="secondary">
+                <LinkButton href={`/${slug}/consolidado?periodo=${date}`} variant="secondary">
                   Descargar PDF
                 </LinkButton>
               ) : null}
@@ -128,13 +152,13 @@ export default async function ConsolidatedPage(
 
       {data.missingReport.length > 0 ? (
         <Alert tone="info">
-          Sin reporte de este domingo: {data.missingReport.join(', ')}. No entran en la suma.
+          Sin reporte de este período: {data.missingReport.join(', ')}. No entran en la suma.
         </Alert>
       ) : null}
 
       {pending.length > 0 ? (
         <Alert tone="error">
-          Falta la cotización de {pending.join(', ')} para este domingo, así que{' '}
+          Falta la cotización de {pending.join(', ')} para este período, así que{' '}
           {data.missingRate.join(', ')} no {data.missingRate.length === 1 ? 'entra' : 'entran'} en
           el total.
         </Alert>
@@ -142,7 +166,7 @@ export default async function ConsolidatedPage(
 
       {canAdmin(role) && shown.length > 0 ? (
         <Card className="p-5">
-          <h2 className="mb-1 text-sm font-medium text-zinc-900">Cotización del domingo</h2>
+          <h2 className="mb-1 text-sm font-medium text-zinc-900">Cotización del período</h2>
           <p className="mb-4 text-xs text-zinc-500">
             Cuántas unidades de cada moneda equivalen a un dólar. Queda guardada: el consolidado
             de una semana vieja no se mueve porque el dólar cambió hoy.
@@ -153,7 +177,7 @@ export default async function ConsolidatedPage(
             fieldsClassName="flex flex-wrap items-end gap-3"
           >
             <input type="hidden" name="slug" value={slug} />
-            <input type="hidden" name="service_date" value={date} />
+            <input type="hidden" name="period_start" value={date} />
             <Field label="Moneda">
               <Select name="currency_code" className="w-32" required>
                 {[...new Set(shown.map((i) => i.report!.currency_code))]
@@ -180,7 +204,7 @@ export default async function ConsolidatedPage(
       ) : null}
 
       {shown.length === 0 ? (
-        <Alert tone="info">Ningún campus cargó el reporte de este domingo todavía.</Alert>
+        <Alert tone="info">Ningún campus cargó el reporte de este período todavía.</Alert>
       ) : (
         <Card className="overflow-x-auto">
           <table className="w-full min-w-[40rem] text-sm">

@@ -13,7 +13,7 @@ import { slugify } from '@/lib/slug';
  * guardados tambien salen con el nombre nuevo, y si el campus se renombra el
  * archivo sale con el nombre de ahora.
  */
-export type PdfKind = 'acta' | 'cierre' | 'caja' | 'recibo' | 'pl';
+export type PdfKind = 'acta' | 'cierre' | 'caja' | 'recibo' | 'pl' | 'semanal';
 
 const PREFIX: Record<PdfKind, string> = {
   acta: 'acta',
@@ -21,6 +21,7 @@ const PREFIX: Record<PdfKind, string> = {
   caja: 'caja',
   recibo: 'recibo',
   pl: 'profit-loss',
+  semanal: 'semanal',
 };
 
 export function pdfName({

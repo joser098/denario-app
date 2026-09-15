@@ -49,12 +49,12 @@ export async function buildConsolidated(
         .from('pl_reports')
         .select('*')
         .eq('organization_id', organizationId)
-        .eq('service_date', date),
+        .eq('start_date', date),
       supabase
         .from('exchange_rates')
         .select('currency_code, units_per_usd')
         .eq('organization_id', organizationId)
-        .eq('service_date', date),
+        .eq('period_start', date),
     ]);
 
   if (!organization) return null;

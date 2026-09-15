@@ -46,6 +46,49 @@ export const CHANGELOG: Release[] = [
     date: '2026-09-15',
     changes: [
       {
+        kind: 'cambio',
+        area: 'Domingos, Semanal y Profit & Loss',
+        title: 'Los tres módulos ahora se alimentan entre sí',
+        detail:
+          'La plata se carga una sola vez y corre sola: al cerrar un domingo, su efectivo, lo digital y las ventas bajan al período del Semanal que lo contiene; al cerrar el período, sus totales bajan al Profit & Loss de ese campus. Se terminó tipear el mismo número tres veces.',
+        action:
+          'Si reabrís un domingo, sus movimientos salen del Semanal y vuelven cuando lo cerrás de nuevo. Un domingo no se puede cerrar si su fecha no cae en ningún período abierto.',
+      },
+      {
+        kind: 'cambio',
+        area: 'Semanal',
+        title: 'El período lo abre un administrador, para todos los campus',
+        detail:
+          'Antes cada campus abría el suyo. Ahora un administrador elige desde y hasta una sola vez y el período se abre en todos los campus, cada uno con su Profit & Loss ya creado con esas mismas fechas.',
+        action:
+          'Si sos tesorero ya no abrís períodos: cargás adentro del que esté abierto. Pedile a un administrador que abra el que falte.',
+      },
+      {
+        kind: 'cambio',
+        area: 'Profit & Loss',
+        title: 'El reporte ya no es de un domingo: cubre el período',
+        detail:
+          'Cada reporte tapa el mismo tramo de fechas que el período del Semanal del que sale. El consolidado también pasó a elegirse por período en vez de por domingo, y las cotizaciones se cargan por período.',
+        action:
+          'Los renglones que trae el Semanal vienen cargados pero se pueden corregir a mano. Al lado de cada uno se ve lo que dice el Semanal, y si no coinciden queda marcado.',
+      },
+      {
+        kind: 'nuevo',
+        area: 'Semanal',
+        title: 'Cotización, categorías de gasto y datos de control',
+        detail:
+          'El período lleva todo a la moneda del campus con la cotización que carga un administrador (10 USD × 1500 = 15.000 ARS). Cada egreso lleva su categoría —las mismas nueve del Profit & Loss— y así baja al renglón que le toca. Transacciones dejó de ser un ingreso (no es dinero) y se le sumaron los sobres que trae el domingo: los dos juntos son la participación del reporte.',
+        action:
+          'Un período no se puede cerrar si falta una cotización o si quedan egresos sin categoría. Los dos avisos aparecen arriba en la pantalla del período, y la categoría se elige ahí mismo, en cada movimiento.',
+      },
+      {
+        kind: 'nuevo',
+        area: 'Actas',
+        title: 'El cierre del período y el Profit & Loss quedan archivados',
+        detail:
+          'Al cerrar un período se genera su PDF, con el detalle de los movimientos y las cotizaciones que se usaron. Ese PDF y el del Profit & Loss ahora aparecen en Actas, junto a los conteos, las cajas y los cierres de domingo.',
+      },
+      {
         kind: 'nuevo',
         area: 'Domingos',
         title: 'Un domingo abierto por error se puede borrar',

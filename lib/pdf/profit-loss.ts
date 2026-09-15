@@ -1,7 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
-import { formatLong, formatStamp, timezoneOf } from '@/lib/dates';
+import { formatRange, formatStamp, timezoneOf } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import {
   EXPENSE_FIELDS,
@@ -64,10 +64,10 @@ export async function buildProfitLoss(
   sheet.text(campus?.name ?? '', { size: 9, muted: true });
   sheet.gap(10);
   sheet.title('Profit & Loss Report');
-  sheet.text(`${formatLong(report.service_date)} · montos en ${report.currency_code}`, {
-    size: 10,
-    muted: true,
-  });
+  sheet.text(
+    `${formatRange({ start: report.start_date, end: report.end_date })} · montos en ${report.currency_code}`,
+    { size: 10, muted: true },
+  );
   sheet.gap(6);
   sheet.rule(true);
 
@@ -151,7 +151,7 @@ export async function buildProfitLoss(
 
   return {
     // El campus va en el path porque es lo que mira RLS sobre el bucket.
-    path: `${report.organization_id}/${report.campus_id}/${report.service_date}-${report.id}.pdf`,
+    path: `${report.organization_id}/${report.campus_id}/${report.start_date}-${report.id}.pdf`,
     bytes: await sheet.save(),
   };
 }

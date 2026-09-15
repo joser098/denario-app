@@ -5,7 +5,7 @@ import { buildConsolidated } from '@/lib/pdf/consolidado';
 import { pdfName } from '@/lib/pdf/names';
 
 /**
- * El consolidado de un domingo, en PDF.
+ * El consolidado de un periodo, en PDF.
  *
  * Se arma en el momento y no se guarda: cambia cada vez que un campus cierra
  * su reporte o el admin corrige una cotización, así que un archivo congelado
@@ -18,16 +18,16 @@ export async function GET(request: NextRequest, ctx: RouteContext<'/[slug]/conso
 
   if (campusId) return new NextResponse('No encontrado', { status: 404 });
 
-  const date = request.nextUrl.searchParams.get('fecha') ?? '';
+  const date = request.nextUrl.searchParams.get('periodo') ?? '';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return new NextResponse('Falta el domingo', { status: 400 });
+    return new NextResponse('Falta el período', { status: 400 });
   }
 
   const supabase = await createClient();
   const bytes = await buildConsolidated(supabase, organization.id, date);
 
   if (!bytes) {
-    return new NextResponse('Ningún campus cerró el reporte de este domingo', { status: 404 });
+    return new NextResponse('Ningún campus cerró el reporte de este período', { status: 404 });
   }
 
   return new NextResponse(bytes as unknown as BodyInit, {

@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { canWrite, requireOrg } from '@/lib/auth';
-import { openWeek } from '@/lib/actions/weeks';
+import { canAdmin, requireOrg } from '@/lib/auth';
+import { openPeriod } from '@/lib/actions/weeks';
 import { createClient } from '@/lib/supabase/server';
 import { formatRange, todayIn, weekOf } from '@/lib/dates';
 import { formatTotals } from '@/lib/money';
@@ -8,14 +8,16 @@ import { isEmpty } from '@/lib/sundays';
 import type { WeekAmount } from '@/lib/database.types';
 import { hasMovements, weekTotals } from '@/lib/weeks';
 import { ActionForm } from '@/components/form';
-import { Badge, Card, EmptyState, Field, Input, PageHeader, Select } from '@/components/ui';
+import { Badge, Card, EmptyState, Field, Input, PageHeader } from '@/components/ui';
 
 export const metadata = { title: 'Semanal' };
 
 export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
   const { slug } = await props.params;
   const { organization, campuses, campusId, role } = await requireOrg(slug);
-  const writes = canWrite(role);
+  // El período es de toda la organización: lo abre un administrador y se abre
+  // igual en todos los campus. El tesorero carga adentro del que ya está.
+  const admin = canAdmin(role);
 
   // Sugerencia para el formulario, no una regla: la semana martes a lunes
   // que corre hoy. Las dos fechas se editan.
@@ -34,7 +36,7 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
 
   const { data: weeks } = await query
     .order('start_date', { ascending: false })
-    .limit(30);
+    .limit(60);
 
   const ids = (weeks ?? []).map((w) => w.id);
   const { data: amounts } = ids.length
@@ -46,20 +48,35 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
     rowsByWeek.set(row.week_id, [...(rowsByWeek.get(row.week_id) ?? []), row]);
   }
 
+  // Un período es el mismo tramo de calendario en todos los campus, así que
+  // la lista lo muestra una sola vez con sus campus adentro. Cuatro filas
+  // repitiendo las mismas fechas no dejaban ver cuántos períodos había.
+  const periods = new Map<string, { start: string; end: string; weeks: typeof weeks }>();
+  for (const week of weeks ?? []) {
+    const key = `${week.start_date}|${week.end_date}`;
+    const period = periods.get(key) ?? {
+      start: week.start_date,
+      end: week.end_date,
+      weeks: [] as typeof weeks,
+    };
+    period.weeks!.push(week);
+    periods.set(key, period);
+  }
+
   const campusName = (id: string) => campuses.find((c) => c.id === id)?.name ?? 'Campus';
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Semanal"
-        subtitle="Libro general por período. Se carga aparte de Domingos."
+        subtitle="El libro general. Recibe los domingos y alimenta el Profit & Loss."
       />
 
-      {writes ? (
+      {admin ? (
         <Card className="p-5">
           <h2 className="mb-4 text-sm font-medium text-zinc-900">Abrir un período</h2>
           <ActionForm
-            action={openWeek}
+            action={openPeriod}
             submitLabel="Abrir período"
             fieldsClassName="flex flex-wrap items-end gap-3"
           >
@@ -78,7 +95,7 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
                 required
               />
             </Field>
-            <Field label="Hasta" hint="El período que quieras. No puede pisarse con otro del campus.">
+            <Field label="Hasta" hint="No puede pisarse con otro período.">
               <Input
                 name="end_date"
                 type="date"
@@ -87,76 +104,77 @@ export default async function WeeksPage(props: PageProps<'/[slug]/semanal'>) {
                 required
               />
             </Field>
-            <Field label="Campus">
-              <Select
-                name="campus_id"
-                defaultValue={campusId ?? campuses[0]?.id ?? ''}
-                className="w-56"
-                required
-              >
-                {campuses.map((campus) => (
-                  <option key={campus.id} value={campus.id}>
-                    {campus.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <p className="w-full text-xs text-zinc-500 sm:w-auto sm:self-center">
+              Se abre en todos los campus, y cada uno arranca su Profit &amp; Loss con estas
+              mismas fechas.
+            </p>
           </ActionForm>
         </Card>
       ) : null}
 
       {(weeks ?? []).length === 0 ? (
         <EmptyState
-          title="Todavía no abriste ningún período."
-          description="Elegí desde y hasta arriba. Un gasto solo entra al libro si su fecha cae adentro de un período abierto."
+          title="Todavía no hay ningún período abierto."
+          description={
+            admin
+              ? 'Elegí desde y hasta arriba. Sin un período abierto no se puede cerrar un domingo ni registrar un gasto.'
+              : 'Los abre un administrador. Sin un período abierto no se puede cerrar un domingo ni registrar un gasto.'
+          }
         />
       ) : (
-        <Card className="divide-y divide-zinc-100">
-          {(weeks ?? []).map((week) => {
-            const totals = weekTotals(rowsByWeek.get(week.id));
+        <div className="flex flex-col gap-5">
+          {[...periods.values()].map((period) => (
+            <section key={`${period.start}|${period.end}`} className="flex flex-col gap-2">
+              <h2 className="text-sm font-medium text-zinc-900">
+                {formatRange({ start: period.start, end: period.end })}
+              </h2>
 
-            return (
-              <Link
-                key={week.id}
-                href={`/${slug}/semanal/${week.id}`}
-                className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 hover:bg-zinc-50"
-              >
-                <div>
-                  <p className="text-sm font-medium text-zinc-900">
-                    {formatRange({ start: week.start_date, end: week.end_date })}
-                  </p>
-                  <p className="text-xs text-zinc-500">{campusName(week.campus_id)}</p>
-                </div>
+              <Card className="divide-y divide-zinc-100">
+                {(period.weeks ?? []).map((week) => {
+                  const totals = weekTotals(rowsByWeek.get(week.id));
 
-                <div className="flex items-center gap-4">
-                  {hasMovements(totals) ? (
-                    <div className="text-right">
-                      <p className="text-sm font-medium tabular-nums text-zinc-900">
-                        {formatTotals(totals.balance)}
+                  return (
+                    <Link
+                      key={week.id}
+                      href={`/${slug}/semanal/${week.id}`}
+                      className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 hover:bg-zinc-50"
+                    >
+                      <p className="text-sm font-medium text-zinc-900">
+                        {campusName(week.campus_id)}
                       </p>
-                      {isEmpty(totals.expense) ? null : (
-                        <p className="text-xs text-zinc-500">
-                          Ingresos {formatTotals(totals.income)} · Egresos{' '}
-                          {formatTotals(totals.expense)}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-sm text-zinc-500">Sin movimientos</span>
-                  )}
-                  <Badge tone={week.status === 'closed' ? 'green' : 'amber'}>
-                    {week.status === 'closed' ? 'Cerrado' : 'Abierto'}
-                  </Badge>
-                </div>
-              </Link>
-            );
-          })}
-        </Card>
+
+                      <div className="flex items-center gap-4">
+                        {hasMovements(totals) ? (
+                          <div className="text-right">
+                            <p className="text-sm font-medium tabular-nums text-zinc-900">
+                              {formatTotals(totals.balance)}
+                            </p>
+                            {isEmpty(totals.expense) ? null : (
+                              <p className="text-xs text-zinc-500">
+                                Ingresos {formatTotals(totals.income)} · Egresos{' '}
+                                {formatTotals(totals.expense)}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-zinc-500">Sin movimientos</span>
+                        )}
+                        <Badge tone={week.status === 'closed' ? 'green' : 'amber'}>
+                          {week.status === 'closed' ? 'Cerrado' : 'Abierto'}
+                        </Badge>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </Card>
+            </section>
+          ))}
+        </div>
       )}
 
       <p className="text-xs text-zinc-500">
-        Los períodos no se abren solos. Un pago o una compra cuya fecha no caiga en ninguno no se
-        registra hasta que lo abras.
+        Los períodos no se abren solos. Un domingo, un pago o una compra cuya fecha no caiga en
+        ninguno no se puede registrar hasta que un administrador lo abra.
       </p>
     </div>
   );
